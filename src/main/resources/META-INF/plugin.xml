@@ -1,0 +1,60 @@
+<!-- Plugin Configuration File: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <!-- Unique identifier of the plugin. It should be FQN, cannot be changed between the plugin versions. -->
+    <id>com.c75.MagicCodeInsert</id>
+
+    <!-- Public plugin name should be written in Title Case.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-name -->
+    <name>MagicCodeInsert</name>
+
+    <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
+    <vendor url="https://www.yourcompany.com">YourCompany</vendor>
+
+    <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-description -->
+    <description><![CDATA[
+        A plugin that sends code to LLM (OpenAI-compatible API) and inserts generated code at cursor position.<br>
+        <em>Features:</em>
+        <ul>
+            <li>Configurable OpenAI-compatible API endpoint</li>
+            <li>Customizable system prompt</li>
+            <li>Hotkey support for quick code insertion</li>
+            <li>Cursor position marked with &lt;&lt;&lt;CURSOR&gt;&gt;&gt; in the request</li>
+        </ul>
+    ]]></description>
+
+    <!-- Product and plugin compatibility requirements.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
+    <depends>com.intellij.modules.platform</depends>
+
+    <resource-bundle>messages.MyMessageBundle</resource-bundle>
+    
+    <!-- Extensions defined by the plugin.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="MyToolWindow" factoryClass="com.c75.magiccodeinsert.MyToolWindowFactory"
+                    icon="AllIcons.Toolwindows.ToolWindowPalette"/>
+        
+        <!-- Settings page -->
+        <applicationConfigurable 
+            parentId="tools"
+            instance="com.c75.magiccodeinsert.settings.MagicCodeInsertConfigurable"
+            id="com.c75.magiccodeinsert.settings.MagicCodeInsertConfigurable"
+            displayName="Magic Code Insert"/>
+        
+        <!-- Application-level services -->
+        <applicationService serviceImplementation="com.c75.magiccodeinsert.settings.MagicCodeInsertSettings"/>
+        <applicationService serviceImplementation="com.c75.magiccodeinsert.service.LLMService"/>
+    </extensions>
+    
+    <!-- Actions -->
+    <actions>
+        <action id="MagicCodeInsert.InsertCodeFromLLM"
+                class="com.c75.magiccodeinsert.action.InsertCodeFromLLMAction"
+                text="Insert Code from LLM"
+                description="Send code with cursor marker to LLM and insert generated code">
+            <add-to-group group-id="EditorActions" anchor="last"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt L"/>
+        </action>
+    </actions>
+</idea-plugin>
