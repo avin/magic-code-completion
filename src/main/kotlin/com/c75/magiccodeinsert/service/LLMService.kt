@@ -5,10 +5,13 @@ import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.intellij.util.net.ssl.CertificateManager
+import com.intellij.util.proxy.CommonProxy
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.net.URI
 import java.util.concurrent.TimeUnit
 
 @Service(Service.Level.APP)
@@ -18,11 +21,36 @@ class LLMService {
     private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     
     private fun createClient(settings: MagicCodeInsertSettings.State): OkHttpClient {
-        return OkHttpClient.Builder()
+        val builder = OkHttpClient.Builder()
             .connectTimeout(settings.connectTimeout.toLong(), TimeUnit.SECONDS)
             .readTimeout(settings.readTimeout.toLong(), TimeUnit.SECONDS)
             .writeTimeout(settings.writeTimeout.toLong(), TimeUnit.SECONDS)
-            .build()
+        
+        // Use IDE proxy settings via CommonProxy
+        try {
+            val uri = URI(settings.apiEndpoint)
+            val proxySelector = CommonProxy.getInstance()
+            val proxies = proxySelector.select(uri)
+            
+            if (proxies != null && proxies.isNotEmpty()) {
+                val proxy = proxies.first()
+                if (proxy.type() != java.net.Proxy.Type.DIRECT) {
+                    builder.proxy(proxy)
+                }
+            }
+        } catch (e: Exception) {
+            // If proxy configuration fails, continue without proxy
+        }
+        
+        // Add IDE SSL certificate trust
+        try {
+            val sslContext = CertificateManager.getInstance().sslContext
+            builder.sslSocketFactory(sslContext.socketFactory, CertificateManager.getInstance().trustManager)
+        } catch (e: Exception) {
+            // Continue with default SSL if custom certs fail
+        }
+        
+        return builder.build()
     }
     
     data class ChatRequest(
