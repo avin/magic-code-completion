@@ -19,7 +19,16 @@ class MagicCodeInsertSettings : PersistentStateComponent<MagicCodeInsertSettings
         var connectTimeout: Int = 30,
         var readTimeout: Int = 120,
         var writeTimeout: Int = 30,
-        var codeMapIncludePatterns: MutableList<String> = mutableListOf()
+        var codeMapIncludePatterns: MutableList<String> = mutableListOf(),
+        var excludeFiles: Boolean = true,
+        var excludePatterns: MutableList<String> = mutableListOf(
+            ".*\\.test\\.[^.]+$",
+            ".*\\.spec\\.[^.]+$",
+            ".*/__tests__/.*",
+            ".*\\.test/.*",
+            ".*\\.spec/.*"
+        ),
+        var debugMode: Boolean = false
     )
     
     private var myState = State()

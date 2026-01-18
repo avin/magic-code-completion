@@ -3,13 +3,18 @@ package com.c75.magiccodeinsert.service
 import com.c75.magiccodeinsert.settings.MagicCodeInsertSettings
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
+import com.intellij.notification.NotificationGroupManager
+import com.intellij.notification.NotificationType
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.util.net.ssl.CertificateManager
 import com.intellij.util.proxy.CommonProxy
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.awt.datatransfer.StringSelection
 import java.io.IOException
 import java.net.URI
 import java.util.concurrent.TimeUnit
@@ -19,6 +24,7 @@ class LLMService {
     
     private val gson = Gson()
     private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+    private val LOG = Logger.getInstance(LLMService::class.java)
     
     private fun createClient(settings: MagicCodeInsertSettings.State): OkHttpClient {
         val builder = OkHttpClient.Builder()
@@ -126,6 +132,49 @@ class LLMService {
         )
         
         val requestBody = gson.toJson(chatRequest).toRequestBody(JSON_MEDIA_TYPE)
+        
+        // Debug logging if enabled
+        if (settings.debugMode) {
+            val fullRequest = buildString {
+                appendLine("=".repeat(80))
+                appendLine("LLM REQUEST DEBUG")
+                appendLine("=".repeat(80))
+                appendLine("Endpoint: ${settings.apiEndpoint}")
+                appendLine("Model: ${settings.model}")
+                appendLine("Temperature: ${settings.temperature}")
+                appendLine("Max Tokens: ${settings.maxTokens}")
+                appendLine("-".repeat(80))
+                appendLine("System Prompt:")
+                appendLine(settings.systemPrompt)
+                appendLine("-".repeat(80))
+                appendLine("User Message:")
+                appendLine(userMessage)
+                appendLine("=".repeat(80))
+            }
+            
+            LOG.info(fullRequest)
+            
+            // Show notification with copy button
+            val preview = if (userMessage.length > 500) {
+                userMessage.substring(0, 500) + "... (${userMessage.length} chars total)"
+            } else {
+                userMessage
+            }
+            
+            NotificationGroupManager.getInstance()
+                .getNotificationGroup("Magic Code Insert")
+                .createNotification(
+                    "LLM Request Debug",
+                    "Request: ${preview}\n\nFull request logged to IDE log. Click to copy full request.",
+                    NotificationType.INFORMATION
+                )
+                .addAction(object : com.intellij.openapi.actionSystem.AnAction("Copy Full Request") {
+                    override fun actionPerformed(e: com.intellij.openapi.actionSystem.AnActionEvent) {
+                        CopyPasteManager.getInstance().setContents(StringSelection(fullRequest))
+                    }
+                })
+                .notify(null)
+        }
         
         val request = Request.Builder()
             .url(settings.apiEndpoint)

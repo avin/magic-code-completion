@@ -22,6 +22,9 @@ class MagicCodeInsertConfigurable : Configurable {
     private var writeTimeoutValue = 30
     private var codeMapPatternsText = ""
     private var systemPromptContent = ""
+    private var excludeFilesEnabled = true
+    private var excludePatternsText = ""
+    private var debugModeEnabled = false
     
     override fun getDisplayName(): String = "Magic Code Insert"
     
@@ -38,7 +41,10 @@ class MagicCodeInsertConfigurable : Configurable {
         readTimeoutValue = settings.readTimeout
         writeTimeoutValue = settings.writeTimeout
         codeMapPatternsText = settings.codeMapIncludePatterns.joinToString("\n")
+        excludeFilesEnabled = settings.excludeFiles
+        excludePatternsText = settings.excludePatterns.joinToString("\n")
         systemPromptContent = settings.systemPrompt
+        debugModeEnabled = settings.debugMode
         
         settingsPanel = panel {
             group("OpenAI API Configuration") {
@@ -99,6 +105,28 @@ class MagicCodeInsertConfigurable : Configurable {
                         .bindText({ codeMapPatternsText }, { codeMapPatternsText = it })
                         .comment("Glob patterns for files to include in code map (one per line). Examples:\nsrc/**/*.js\nsrc/**/*.ts\nlib/**/*.py")
                 }
+                row {
+                    checkBox("Exclude files")
+                        .bindSelected({ excludeFilesEnabled }, { excludeFilesEnabled = it })
+                        .comment("Automatically exclude files matching patterns below")
+                }
+                row {
+                    textArea()
+                        .rows(5)
+                        .resizableColumn()
+                        .align(AlignX.FILL)
+                        .bindText({ excludePatternsText }, { excludePatternsText = it })
+                        .comment("Regex patterns to exclude files (one per line). Examples:\n.*\\.test\\.[^.]+$\n.*\\.spec\\.[^.]+$\n.*/__tests__/.*")
+                        .enabled(excludeFilesEnabled)
+                }
+            }
+            
+            group("Debug") {
+                row {
+                    checkBox("Enable debug mode")
+                        .bindSelected({ debugModeEnabled }, { debugModeEnabled = it })
+                        .comment("Log full LLM request to IDE log and show notification")
+                }
             }
             
             group("System Prompt") {
@@ -143,12 +171,19 @@ class MagicCodeInsertConfigurable : Configurable {
         settings.connectTimeout = connectTimeoutValue
         settings.readTimeout = readTimeoutValue
         settings.writeTimeout = writeTimeoutValue
+        settings.excludeFiles = excludeFilesEnabled
         settings.codeMapIncludePatterns = codeMapPatternsText
             .lineSequence()
             .map { it.trim() }
             .filter { it.isNotEmpty() }
             .toMutableList()
+        settings.excludePatterns = excludePatternsText
+            .lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .toMutableList()
         settings.systemPrompt = systemPromptContent
+        settings.debugMode = debugModeEnabled
     }
     
     override fun reset() {
@@ -162,6 +197,9 @@ class MagicCodeInsertConfigurable : Configurable {
         readTimeoutValue = settings.readTimeout
         writeTimeoutValue = settings.writeTimeout
         codeMapPatternsText = settings.codeMapIncludePatterns.joinToString("\n")
+        excludeFilesEnabled = settings.excludeFiles
+        excludePatternsText = settings.excludePatterns.joinToString("\n")
+        debugModeEnabled = settings.debugMode
         systemPromptContent = settings.systemPrompt
         settingsPanel?.reset()
     }

@@ -31,6 +31,9 @@
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
         
+        <!-- Notification group for debug messages -->
+        <notificationGroup id="Magic Code Insert" displayType="BALLOON"/>
+        
         <!-- Settings page -->
         <applicationConfigurable 
             parentId="tools"
