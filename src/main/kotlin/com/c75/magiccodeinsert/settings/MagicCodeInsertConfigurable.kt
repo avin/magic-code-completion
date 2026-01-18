@@ -89,7 +89,8 @@ class MagicCodeInsertConfigurable : Configurable {
                 row {
                     textArea()
                         .rows(10)
-                        .columns(COLUMNS_LARGE)
+                        .resizableColumn()
+                        .align(AlignX.FILL)
                         .bindText({ systemPromptContent }, { systemPromptContent = it })
                         .comment("Instructions for the LLM. Use <<<CURSOR>>> as placeholder for cursor position.")
                 }

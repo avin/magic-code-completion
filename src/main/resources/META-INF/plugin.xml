@@ -26,14 +26,10 @@
     <!-- Product and plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
-
-    <resource-bundle>messages.MyMessageBundle</resource-bundle>
     
     <!-- Extensions defined by the plugin.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow id="MyToolWindow" factoryClass="com.c75.magiccodeinsert.MyToolWindowFactory"
-                    icon="AllIcons.Toolwindows.ToolWindowPalette"/>
         
         <!-- Settings page -->
         <applicationConfigurable 
@@ -54,7 +50,7 @@
                 text="Insert Code from LLM"
                 description="Send code with cursor marker to LLM and insert generated code">
             <add-to-group group-id="EditorActions" anchor="last"/>
-            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt L"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="alt I"/>
         </action>
     </actions>
 </idea-plugin>
