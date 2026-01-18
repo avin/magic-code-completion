@@ -86,23 +86,40 @@ class LLMService {
     /**
      * Send code with cursor marker to LLM and get completion
      * @param codeWithCursor The code with <<<CURSOR>>> marker
+     * @param project Current project (for code map generation)
+     * @param currentFilePath Current file path relative to project root
      * @param settingsState Optional settings state (for testing)
      * @return Generated code to insert at cursor position
      * @throws IOException if network request fails
      * @throws LLMException if API returns an error
      */
-    fun getCodeCompletion(codeWithCursor: String, settingsState: MagicCodeInsertSettings.State? = null): String {
+    fun getCodeCompletion(
+        codeWithCursor: String, 
+        project: com.intellij.openapi.project.Project? = null,
+        currentFilePath: String? = null,
+        settingsState: MagicCodeInsertSettings.State? = null
+    ): String {
         val settings = settingsState ?: MagicCodeInsertSettings.getInstance().state
         
         if (settings.apiKey.isBlank()) {
             throw LLMException("API key is not configured. Please set it in Settings > Magic Code Insert")
         }
         
+        // Generate code map if patterns are configured
+        var userMessage = codeWithCursor
+        if (project != null && settings.codeMapIncludePatterns.isNotEmpty()) {
+            val codeMapService = project.service<com.c75.magiccodeinsert.services.CodeMapService>()
+            val codeMap = codeMapService.generateCodeMap(settings.codeMapIncludePatterns, currentFilePath)
+            if (codeMap.isNotBlank()) {
+                userMessage = codeMap + codeWithCursor
+            }
+        }
+        
         val chatRequest = ChatRequest(
             model = settings.model,
             messages = listOf(
                 Message(role = "system", content = settings.systemPrompt),
-                Message(role = "user", content = codeWithCursor)
+                Message(role = "user", content = userMessage)
             ),
             temperature = settings.temperature,
             maxTokens = settings.maxTokens

@@ -61,7 +61,7 @@ class LLMServiceTest {
             .addHeader("Content-Type", "application/json"))
         
         val codeWithCursor = "// Add hello function\n<<<CURSOR>>>"
-        val result = llmService.getCodeCompletion(codeWithCursor, settings)
+        val result = llmService.getCodeCompletion(codeWithCursor, null, null, settings)
         
         assertEquals("function hello() {\n    console.log('Hello');\n}", result)
         
@@ -93,7 +93,7 @@ class LLMServiceTest {
             .addHeader("Content-Type", "application/json"))
         
         val exception = assertThrows(LLMService.LLMException::class.java) {
-            llmService.getCodeCompletion("test code", settings)
+            llmService.getCodeCompletion("test code", null, null, settings)
         }
         
         assertTrue(exception.message!!.contains("Invalid API key"))
@@ -106,7 +106,7 @@ class LLMServiceTest {
             .setBody("Internal Server Error"))
         
         val exception = assertThrows(LLMService.LLMException::class.java) {
-            llmService.getCodeCompletion("test code", settings)
+            llmService.getCodeCompletion("test code", null, null, settings)
         }
         
         assertTrue(exception.message!!.contains("HTTP 500"))
@@ -117,7 +117,7 @@ class LLMServiceTest {
         settings.apiKey = ""
         
         val exception = assertThrows(LLMService.LLMException::class.java) {
-            llmService.getCodeCompletion("test code", settings)
+            llmService.getCodeCompletion("test code", null, null, settings)
         }
         
         assertTrue(exception.message!!.contains("API key is not configured"))
@@ -138,7 +138,7 @@ class LLMServiceTest {
             .addHeader("Content-Type", "application/json"))
         
         val exception = assertThrows(LLMService.LLMException::class.java) {
-            llmService.getCodeCompletion("test code", settings)
+            llmService.getCodeCompletion("test code", null, null, settings)
         }
         
         assertTrue(exception.message!!.contains("No completion in response"))
@@ -170,7 +170,7 @@ class LLMServiceTest {
         settings.maxTokens = 1000
         settings.systemPrompt = "Custom prompt"
         
-        llmService.getCodeCompletion("test code", settings)
+        llmService.getCodeCompletion("test code", null, null, settings)
         
         val request = mockServer.takeRequest()
         val requestBody = request.body.readUtf8()
@@ -204,7 +204,7 @@ class LLMServiceTest {
             .setBody(mockResponse)
             .addHeader("Content-Type", "application/json"))
         
-        val result = llmService.getCodeCompletion("test", settings)
+        val result = llmService.getCodeCompletion("test", null, null, settings)
         
         assertEquals("trimmed content", result)
     }

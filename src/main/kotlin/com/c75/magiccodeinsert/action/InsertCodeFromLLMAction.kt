@@ -33,10 +33,18 @@ class InsertCodeFromLLMAction : AnAction() {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val editor = e.getData(CommonDataKeys.EDITOR) ?: return
+        val virtualFile = e.getData(CommonDataKeys.VIRTUAL_FILE)
         
         val document = editor.document
         val caretModel = editor.caretModel
         val caretOffset = caretModel.offset
+        
+        // Get relative file path
+        val currentFilePath = if (virtualFile != null && project.basePath != null) {
+            virtualFile.path.removePrefix(project.basePath!!).removePrefix("/").removePrefix("\\")
+        } else {
+            null
+        }
         
         // Get document text and insert cursor marker
         val textBeforeCursor = document.text.substring(0, caretOffset)
@@ -58,7 +66,7 @@ class InsertCodeFromLLMAction : AnAction() {
                 
                 try {
                     val llmService = LLMService.getInstance()
-                    generatedCode = llmService.getCodeCompletion(codeWithCursor)
+                    generatedCode = llmService.getCodeCompletion(codeWithCursor, project, currentFilePath)
                 } catch (e: LLMService.LLMException) {
                     error = e.message
                 } catch (e: Exception) {

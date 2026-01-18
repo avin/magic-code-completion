@@ -20,6 +20,7 @@ class MagicCodeInsertConfigurable : Configurable {
     private var connectTimeoutValue = 30
     private var readTimeoutValue = 120
     private var writeTimeoutValue = 30
+    private var codeMapPatternsText = ""
     private var systemPromptContent = ""
     
     override fun getDisplayName(): String = "Magic Code Insert"
@@ -33,6 +34,10 @@ class MagicCodeInsertConfigurable : Configurable {
         modelField.text = settings.model
         temperatureValue = settings.temperature
         maxTokensValue = settings.maxTokens
+        connectTimeoutValue = settings.connectTimeout
+        readTimeoutValue = settings.readTimeout
+        writeTimeoutValue = settings.writeTimeout
+        codeMapPatternsText = settings.codeMapIncludePatterns.joinToString("\n")
         systemPromptContent = settings.systemPrompt
         
         settingsPanel = panel {
@@ -85,6 +90,17 @@ class MagicCodeInsertConfigurable : Configurable {
                 }
             }
             
+            group("Code Map (optional)") {
+                row {
+                    textArea()
+                        .rows(5)
+                        .resizableColumn()
+                        .align(AlignX.FILL)
+                        .bindText({ codeMapPatternsText }, { codeMapPatternsText = it })
+                        .comment("Glob patterns for files to include in code map (one per line). Examples:\nsrc/**/*.js\nsrc/**/*.ts\nlib/**/*.py")
+                }
+            }
+            
             group("System Prompt") {
                 row {
                     textArea()
@@ -108,18 +124,16 @@ class MagicCodeInsertConfigurable : Configurable {
     
     override fun isModified(): Boolean {
         val settings = MagicCodeInsertSettings.getInstance().state
-        return apiEndpointField.text != settings.apiEndpoint ||
+        val panelModified = settingsPanel?.isModified() ?: false
+        return panelModified ||
+                apiEndpointField.text != settings.apiEndpoint ||
                 String(apiKeyField.password) != settings.apiKey ||
                 modelField.text != settings.model ||
-                temperatureValue != settings.temperature ||
-                maxTokensValue != settings.maxTokens ||
-                connectTimeoutValue != settings.connectTimeout ||
-                readTimeoutValue != settings.readTimeout ||
-                writeTimeoutValue != settings.writeTimeout ||
-                systemPromptContent != settings.systemPrompt
+                temperatureValue != settings.temperature
     }
     
     override fun apply() {
+        settingsPanel?.apply()
         val settings = MagicCodeInsertSettings.getInstance().state
         settings.apiEndpoint = apiEndpointField.text
         settings.apiKey = String(apiKeyField.password)
@@ -129,6 +143,11 @@ class MagicCodeInsertConfigurable : Configurable {
         settings.connectTimeout = connectTimeoutValue
         settings.readTimeout = readTimeoutValue
         settings.writeTimeout = writeTimeoutValue
+        settings.codeMapIncludePatterns = codeMapPatternsText
+            .lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .toMutableList()
         settings.systemPrompt = systemPromptContent
     }
     
@@ -142,6 +161,7 @@ class MagicCodeInsertConfigurable : Configurable {
         connectTimeoutValue = settings.connectTimeout
         readTimeoutValue = settings.readTimeout
         writeTimeoutValue = settings.writeTimeout
+        codeMapPatternsText = settings.codeMapIncludePatterns.joinToString("\n")
         systemPromptContent = settings.systemPrompt
         settingsPanel?.reset()
     }

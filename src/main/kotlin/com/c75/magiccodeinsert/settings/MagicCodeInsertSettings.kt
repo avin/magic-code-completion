@@ -18,7 +18,8 @@ class MagicCodeInsertSettings : PersistentStateComponent<MagicCodeInsertSettings
         var maxTokens: Int = 2000,
         var connectTimeout: Int = 30,
         var readTimeout: Int = 120,
-        var writeTimeout: Int = 30
+        var writeTimeout: Int = 30,
+        var codeMapIncludePatterns: MutableList<String> = mutableListOf()
     )
     
     private var myState = State()

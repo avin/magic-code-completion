@@ -41,6 +41,9 @@
         <!-- Application-level services -->
         <applicationService serviceImplementation="com.c75.magiccodeinsert.settings.MagicCodeInsertSettings"/>
         <applicationService serviceImplementation="com.c75.magiccodeinsert.service.LLMService"/>
+        
+        <!-- Project-level services -->
+        <projectService serviceImplementation="com.c75.magiccodeinsert.services.CodeMapService"/>
     </extensions>
     
     <!-- Actions -->
