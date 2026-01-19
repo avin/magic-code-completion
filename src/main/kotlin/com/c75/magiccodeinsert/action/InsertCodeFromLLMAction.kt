@@ -9,20 +9,30 @@ import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.Inlay
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.codeStyle.CodeStyleManager
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 class InsertCodeFromLLMAction : AnAction() {
     
     companion object {
         const val CURSOR_MARKER = "<<<CURSOR>>>"
         const val APPLY_EDITS_PREFIX = "APPLY_EDITS:"
+        
+        // ASCII spinner frames (compatible with JetBrains Mono)
+        private val SPINNER_FRAMES = arrayOf("|", "/", "-", "\\")
+        private val scheduler = Executors.newScheduledThreadPool(1)
     }
     
     private val gson = Gson()
@@ -58,6 +68,48 @@ class InsertCodeFromLLMAction : AnAction() {
         val textAfterCursor = document.text.substring(caretOffset)
         val codeWithCursor = textBeforeCursor + CURSOR_MARKER + textAfterCursor
         
+        // Start spinner animation at cursor position
+        var inlayHint: Inlay<*>? = null
+        val frameIndex = AtomicInteger(0)
+        var animationTask: ScheduledFuture<*>? = null
+        
+        ApplicationManager.getApplication().invokeLater {
+            inlayHint = editor.inlayModel.addInlineElement(
+                caretOffset,
+                true,
+                object : com.intellij.openapi.editor.EditorCustomElementRenderer {
+                    override fun calcWidthInPixels(inlay: Inlay<*>): Int {
+                        val metrics = inlay.editor.contentComponent.getFontMetrics(inlay.editor.colorsScheme.getFont(com.intellij.openapi.editor.colors.EditorFontType.PLAIN))
+                        return metrics.stringWidth(getCurrentSpinnerText())
+                    }
+                    
+                    override fun paint(
+                        inlay: Inlay<*>,
+                        g: java.awt.Graphics,
+                        targetRect: java.awt.Rectangle,
+                        textAttributes: com.intellij.openapi.editor.markup.TextAttributes
+                    ) {
+                        g.color = java.awt.Color(128, 128, 128) // Gray color
+                        g.font = inlay.editor.colorsScheme.getFont(com.intellij.openapi.editor.colors.EditorFontType.PLAIN)
+                        g.drawString(getCurrentSpinnerText(), targetRect.x, targetRect.y + inlay.editor.ascent)
+                    }
+                    
+                    private fun getCurrentSpinnerText(): String {
+                        val frame = SPINNER_FRAMES[frameIndex.get() % SPINNER_FRAMES.size]
+                        return "$frame Generating code..."
+                    }
+                }
+            )
+            
+            // Start animation timer
+            animationTask = scheduler.scheduleAtFixedRate({
+                frameIndex.incrementAndGet()
+                ApplicationManager.getApplication().invokeLater {
+                    inlayHint?.update()
+                }
+            }, 0, 100, TimeUnit.MILLISECONDS)
+        }
+        
         // Run LLM request in background task
         ProgressManager.getInstance().run(object : Task.Backgroundable(
             project,
@@ -82,6 +134,12 @@ class InsertCodeFromLLMAction : AnAction() {
             }
             
             override fun onSuccess() {
+                // Stop animation and remove hint
+                animationTask?.cancel(false)
+                ApplicationManager.getApplication().invokeLater {
+                    inlayHint?.let { Disposer.dispose(it) }
+                }
+                
                 if (error != null) {
                     Messages.showErrorDialog(project, error, "LLM Error")
                     return
@@ -106,6 +164,12 @@ class InsertCodeFromLLMAction : AnAction() {
             }
             
             override fun onThrowable(throwable: Throwable) {
+                // Stop animation and remove hint
+                animationTask?.cancel(false)
+                ApplicationManager.getApplication().invokeLater {
+                    inlayHint?.let { Disposer.dispose(it) }
+                }
+                
                 Messages.showErrorDialog(
                     project,
                     "Failed to get code completion: ${throwable.message}",
