@@ -36,6 +36,15 @@ class FileTreeService(private val project: Project) {
             val matchingFiles = mutableListOf<VirtualFile>()
             collectMatchingFiles(baseVirtualFile, basePath, matchers, settings.excludeFiles, settings.excludePatterns, matchingFiles)
             
+            // Always include current file if specified (even if not matching patterns)
+            if (currentFilePath != null) {
+                val currentFullPath = "$basePath/$currentFilePath"
+                val currentFile = com.intellij.openapi.vfs.LocalFileSystem.getInstance().findFileByPath(currentFullPath)
+                if (currentFile != null && !matchingFiles.contains(currentFile)) {
+                    matchingFiles.add(currentFile)
+                }
+            }
+            
             if (matchingFiles.isEmpty()) {
                 return@compute ""
             }
