@@ -98,14 +98,14 @@ class MagicCodeInsertConfigurable(private val project: Project) : Configurable {
                 }
             }
             
-            group("Code Map (optional)") {
+            group("Project Files (Context for LLM)") {
                 row {
                     textArea()
                         .rows(5)
                         .resizableColumn()
                         .align(AlignX.FILL)
                         .bindText({ codeMapPatternsText }, { codeMapPatternsText = it })
-                        .comment("Glob patterns for files to include in code map (one per line). Examples:\nsrc/**/*.js\nsrc/**/*.ts\nlib/**/*.py")
+                        .comment("Glob patterns for files to include in project tree (one per line)")
                 }
                 row {
                     checkBox("Exclude files")
@@ -118,7 +118,7 @@ class MagicCodeInsertConfigurable(private val project: Project) : Configurable {
                         .resizableColumn()
                         .align(AlignX.FILL)
                         .bindText({ excludePatternsText }, { excludePatternsText = it })
-                        .comment("Regex patterns to exclude files (one per line). Examples:\n.*\\.test\\.[^.]+$\n.*\\.spec\\.[^.]+$\n.*/__tests__/.*")
+                        .comment("Regex patterns to exclude files (one per line)")
                         .enabled(excludeFilesEnabled)
                 }
             }

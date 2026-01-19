@@ -12,15 +12,12 @@ class MagicCodeInsertProjectSettings : PersistentStateComponent<MagicCodeInsertP
     
     data class State(
         var codeMapIncludePatterns: MutableList<String> = mutableListOf(
-            "src/**/*.ts",
-            "src/**/*.tsx",
-            "src/**/*.js",
-            "src/**/*.jsx"
+            "src/**/*.{ts,js,tsx,jsx,css,scss}"
         ),
         var excludeFiles: Boolean = true,
         var excludePatterns: MutableList<String> = mutableListOf(
-            ".*\\.test\\..*",
-            ".*\\.spec\\..*"
+            ".*/(__tests__|__mocks__|tests?|specs?)/.*",
+            ".*\\.(test|spec|e2e|int|cy|stories|fixture)\\..*"
         )
     )
     
