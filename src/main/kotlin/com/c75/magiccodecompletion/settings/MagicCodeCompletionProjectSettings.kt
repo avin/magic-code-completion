@@ -1,14 +1,14 @@
-package com.c75.magiccodeinsert.settings
+package com.c75.magiccodecompletion.settings
 
 import com.intellij.openapi.components.*
 import com.intellij.openapi.project.Project
 
 @Service(Service.Level.PROJECT)
 @State(
-    name = "MagicCodeInsertProjectSettings",
-    storages = [Storage("MagicCodeInsertProjectSettings.xml")]
+    name = "MagicCodeCompletionProjectSettings",
+    storages = [Storage("MagicCodeCompletionProjectSettings.xml")]
 )
-class MagicCodeInsertProjectSettings : PersistentStateComponent<MagicCodeInsertProjectSettings.State> {
+class MagicCodeCompletionProjectSettings : PersistentStateComponent<MagicCodeCompletionProjectSettings.State> {
     
     data class State(
         var codeMapIncludePatterns: MutableList<String> = mutableListOf(
@@ -30,6 +30,6 @@ class MagicCodeInsertProjectSettings : PersistentStateComponent<MagicCodeInsertP
     }
     
     companion object {
-        fun getInstance(project: Project): MagicCodeInsertProjectSettings = project.service()
+        fun getInstance(project: Project): MagicCodeCompletionProjectSettings = project.service()
     }
 }

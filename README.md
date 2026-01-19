@@ -1,4 +1,4 @@
-# Magic Code Insert
+# Magic Code Completion
 
 JetBrains IDEs plugin for AI-assisted code completion using OpenAI-compatible APIs with agentic file reading and multi-edit capabilities.
 
@@ -11,7 +11,7 @@ JetBrains IDEs plugin for AI-assisted code completion using OpenAI-compatible AP
 
 ## Settings
 
-**Tools → Magic Code Insert**
+**Tools → Magic Code Completion**
 
 ### API Configuration (Global)
 - API Endpoint (default: OpenAI)

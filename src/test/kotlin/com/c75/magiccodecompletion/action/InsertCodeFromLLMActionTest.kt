@@ -1,6 +1,6 @@
-package com.c75.magiccodeinsert.action
+package com.c75.magiccodecompletion.action
 
-import com.c75.magiccodeinsert.service.LLMService
+import com.c75.magiccodecompletion.service.LLMService
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.editor.Document

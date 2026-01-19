@@ -1,16 +1,16 @@
-package com.c75.magiccodeinsert.settings
+package com.c75.magiccodecompletion.settings
 
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
-class MagicCodeInsertSettingsTest {
+class MagicCodeCompletionSettingsTest {
     
-    private lateinit var settings: MagicCodeInsertSettings
+    private lateinit var settings: MagicCodeCompletionSettings
     
     @BeforeEach
     fun setUp() {
-        settings = MagicCodeInsertSettings()
+        settings = MagicCodeCompletionSettings()
     }
     
     @Test
@@ -39,7 +39,7 @@ class MagicCodeInsertSettingsTest {
         val savedState = settings.state
         
         // Create new settings instance and load state
-        val newSettings = MagicCodeInsertSettings()
+        val newSettings = MagicCodeCompletionSettings()
         newSettings.loadState(savedState)
         
         assertEquals("https://custom.api.com/v1/chat", newSettings.state.apiEndpoint)
@@ -89,7 +89,7 @@ class MagicCodeInsertSettingsTest {
     
     @Test
     fun `test default system prompt contains cursor marker`() {
-        assertEquals(true, MagicCodeInsertSettings.DEFAULT_SYSTEM_PROMPT.contains("<<<CURSOR>>>"))
+        assertEquals(true, MagicCodeCompletionSettings.DEFAULT_SYSTEM_PROMPT.contains("<<<CURSOR>>>"))
     }
     
     @Test

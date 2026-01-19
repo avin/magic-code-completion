@@ -1,6 +1,6 @@
-package com.c75.magiccodeinsert.service
+package com.c75.magiccodecompletion.service
 
-import com.c75.magiccodeinsert.settings.MagicCodeInsertSettings
+import com.c75.magiccodecompletion.settings.MagicCodeCompletionSettings
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.jupiter.api.AfterEach
@@ -12,7 +12,7 @@ class LLMServiceTest {
     
     private lateinit var mockServer: MockWebServer
     private lateinit var llmService: LLMService
-    private lateinit var settings: MagicCodeInsertSettings.State
+    private lateinit var settings: MagicCodeCompletionSettings.State
     
     @BeforeEach
     fun setUp() {
@@ -20,7 +20,7 @@ class LLMServiceTest {
         mockServer.start()
         
         llmService = LLMService()
-        settings = MagicCodeInsertSettings.State()
+        settings = MagicCodeCompletionSettings.State()
         
         // Configure settings to use mock server
         settings.apiEndpoint = mockServer.url("/v1/chat/completions").toString()

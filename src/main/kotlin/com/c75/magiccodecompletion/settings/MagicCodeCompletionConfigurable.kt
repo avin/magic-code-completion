@@ -1,4 +1,4 @@
-package com.c75.magiccodeinsert.settings
+package com.c75.magiccodecompletion.settings
 
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.options.Configurable
@@ -10,7 +10,7 @@ import com.intellij.ui.components.JBTextField
 import com.intellij.ui.dsl.builder.*
 import javax.swing.JComponent
 
-class MagicCodeInsertConfigurable(private val project: Project) : Configurable {
+class MagicCodeCompletionConfigurable(private val project: Project) : Configurable {
     
     private var settingsPanel: DialogPanel? = null
     
@@ -29,11 +29,11 @@ class MagicCodeInsertConfigurable(private val project: Project) : Configurable {
     private var excludePatternsText = ""
     private var debugModeEnabled = false
     
-    override fun getDisplayName(): String = "Magic Code Insert"
+    override fun getDisplayName(): String = "Magic Code Completion"
     
     override fun createComponent(): JComponent {
-        val settings = MagicCodeInsertSettings.getInstance().state
-        val projectSettings = MagicCodeInsertProjectSettings.getInstance(project).state
+        val settings = MagicCodeCompletionSettings.getInstance().state
+        val projectSettings = MagicCodeCompletionProjectSettings.getInstance(project).state
         
         // Initialize fields with current settings
         apiEndpointField.text = settings.apiEndpoint
@@ -145,7 +145,7 @@ class MagicCodeInsertConfigurable(private val project: Project) : Configurable {
                 }
                 row {
                     button("Reset to Default") {
-                        systemPromptContent = MagicCodeInsertSettings.DEFAULT_SYSTEM_PROMPT
+                        systemPromptContent = MagicCodeCompletionSettings.DEFAULT_SYSTEM_PROMPT
                         settingsPanel?.reset()
                     }
                 }
@@ -156,8 +156,8 @@ class MagicCodeInsertConfigurable(private val project: Project) : Configurable {
     }
     
     override fun isModified(): Boolean {
-        val settings = MagicCodeInsertSettings.getInstance().state
-        val projectSettings = MagicCodeInsertProjectSettings.getInstance(project).state
+        val settings = MagicCodeCompletionSettings.getInstance().state
+        val projectSettings = MagicCodeCompletionProjectSettings.getInstance(project).state
         val panelModified = settingsPanel?.isModified() ?: false
         return panelModified ||
                 apiEndpointField.text != settings.apiEndpoint ||
@@ -168,8 +168,8 @@ class MagicCodeInsertConfigurable(private val project: Project) : Configurable {
     
     override fun apply() {
         settingsPanel?.apply()
-        val settings = MagicCodeInsertSettings.getInstance().state
-        val projectSettings = MagicCodeInsertProjectSettings.getInstance(project).state
+        val settings = MagicCodeCompletionSettings.getInstance().state
+        val projectSettings = MagicCodeCompletionProjectSettings.getInstance(project).state
         
         settings.apiEndpoint = apiEndpointField.text
         settings.apiKey = String(apiKeyField.password)
@@ -196,8 +196,8 @@ class MagicCodeInsertConfigurable(private val project: Project) : Configurable {
     }
     
     override fun reset() {
-        val settings = MagicCodeInsertSettings.getInstance().state
-        val projectSettings = MagicCodeInsertProjectSettings.getInstance(project).state
+        val settings = MagicCodeCompletionSettings.getInstance().state
+        val projectSettings = MagicCodeCompletionProjectSettings.getInstance(project).state
         
         apiEndpointField.text = settings.apiEndpoint
         apiKeyField.text = settings.apiKey

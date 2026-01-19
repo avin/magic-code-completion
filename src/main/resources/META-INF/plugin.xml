@@ -1,11 +1,11 @@
 <!-- Plugin Configuration File: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
     <!-- Unique identifier of the plugin. It should be FQN, cannot be changed between the plugin versions. -->
-    <id>com.c75.MagicCodeInsert</id>
+    <id>com.c75.MagicCodeCompletion</id>
 
     <!-- Public plugin name should be written in Title Case.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-name -->
-    <name>MagicCodeInsert</name>
+    <name>MagicCodeCompletion</name>
 
     <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
     <vendor url="https://www.yourcompany.com">YourCompany</vendor>
@@ -37,28 +37,28 @@
     <extensions defaultExtensionNs="com.intellij">
         
         <!-- Notification group for debug messages -->
-        <notificationGroup id="Magic Code Insert" displayType="BALLOON"/>
+        <notificationGroup id="Magic Code Completion" displayType="BALLOON"/>
         
         <!-- Settings page -->
         <projectConfigurable 
             parentId="tools"
-            instance="com.c75.magiccodeinsert.settings.MagicCodeInsertConfigurable"
-            id="com.c75.magiccodeinsert.settings.MagicCodeInsertConfigurable"
-            displayName="Magic Code Insert"/>
+            instance="com.c75.magiccodecompletion.settings.MagicCodeCompletionConfigurable"
+            id="com.c75.magiccodecompletion.settings.MagicCodeCompletionConfigurable"
+            displayName="Magic Code Completion"/>
         
         <!-- Application-level services -->
-        <applicationService serviceImplementation="com.c75.magiccodeinsert.settings.MagicCodeInsertSettings"/>
-        <applicationService serviceImplementation="com.c75.magiccodeinsert.service.LLMService"/>
+        <applicationService serviceImplementation="com.c75.magiccodecompletion.settings.MagicCodeCompletionSettings"/>
+        <applicationService serviceImplementation="com.c75.magiccodecompletion.service.LLMService"/>
         
         <!-- Project-level services -->
-        <projectService serviceImplementation="com.c75.magiccodeinsert.settings.MagicCodeInsertProjectSettings"/>
-        <projectService serviceImplementation="com.c75.magiccodeinsert.services.FileTreeService"/>
+        <projectService serviceImplementation="com.c75.magiccodecompletion.settings.MagicCodeCompletionProjectSettings"/>
+        <projectService serviceImplementation="com.c75.magiccodecompletion.services.FileTreeService"/>
     </extensions>
     
     <!-- Actions -->
     <actions>
-        <action id="MagicCodeInsert.InsertCodeFromLLM"
-                class="com.c75.magiccodeinsert.action.InsertCodeFromLLMAction"
+        <action id="MagicCodeCompletion.InsertCodeFromLLM"
+                class="com.c75.magiccodecompletion.action.InsertCodeFromLLMAction"
                 text="Insert Code from LLM"
                 description="Send code with cursor marker to LLM and insert generated code">
             <add-to-group group-id="EditorActions" anchor="last"/>

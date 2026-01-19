@@ -1,6 +1,6 @@
-package com.c75.magiccodeinsert.action
+package com.c75.magiccodecompletion.action
 
-import com.c75.magiccodeinsert.service.LLMService
+import com.c75.magiccodecompletion.service.LLMService
 import com.google.gson.Gson
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction

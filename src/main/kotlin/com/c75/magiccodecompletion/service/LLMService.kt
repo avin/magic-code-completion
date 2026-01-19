@@ -1,6 +1,6 @@
-package com.c75.magiccodeinsert.service
+package com.c75.magiccodecompletion.service
 
-import com.c75.magiccodeinsert.settings.MagicCodeInsertSettings
+import com.c75.magiccodecompletion.settings.MagicCodeCompletionSettings
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import com.intellij.notification.NotificationGroupManager
@@ -25,7 +25,7 @@ class LLMService {
     private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     private val LOG = Logger.getInstance(LLMService::class.java)
     
-    private fun createClient(settings: MagicCodeInsertSettings.State): OkHttpClient {
+    private fun createClient(settings: MagicCodeCompletionSettings.State): OkHttpClient {
         val builder = OkHttpClient.Builder()
             .connectTimeout(settings.connectTimeout.toLong(), TimeUnit.SECONDS)
             .readTimeout(settings.readTimeout.toLong(), TimeUnit.SECONDS)
@@ -115,20 +115,20 @@ class LLMService {
         codeWithCursor: String, 
         project: com.intellij.openapi.project.Project? = null,
         currentFilePath: String? = null,
-        settingsState: MagicCodeInsertSettings.State? = null
+        settingsState: MagicCodeCompletionSettings.State? = null
     ): String {
-        val settings = settingsState ?: MagicCodeInsertSettings.getInstance().state
+        val settings = settingsState ?: MagicCodeCompletionSettings.getInstance().state
         
         if (settings.apiKey.isBlank()) {
-            throw LLMException("API key is not configured. Please set it in Settings > Magic Code Insert")
+            throw LLMException("API key is not configured. Please set it in Settings > Magic Code Completion")
         }
         
         // Build initial user message with file tree
         var userMessage = buildString {
             if (project != null) {
-                val projectSettings = com.c75.magiccodeinsert.settings.MagicCodeInsertProjectSettings.getInstance(project).state
+                val projectSettings = com.c75.magiccodecompletion.settings.MagicCodeCompletionProjectSettings.getInstance(project).state
                 if (projectSettings.codeMapIncludePatterns.isNotEmpty()) {
-                    val fileTreeService = project.service<com.c75.magiccodeinsert.services.FileTreeService>()
+                    val fileTreeService = project.service<com.c75.magiccodecompletion.services.FileTreeService>()
                     val fileTree = fileTreeService.generateFileTree(projectSettings.codeMapIncludePatterns, currentFilePath)
                     if (fileTree.isNotBlank()) {
                         appendLine(fileTree)
@@ -287,7 +287,7 @@ class LLMService {
                         .joinToString(", ") { it.function.name + "(${it.function.arguments})" }
                     
                     NotificationGroupManager.getInstance()
-                        .getNotificationGroup("Magic Code Insert")
+                        .getNotificationGroup("Magic Code Completion")
                         .createNotification(
                             "LLM Tool Calls",
                             "Iteration $iteration: $toolCallsSummary",
@@ -303,7 +303,7 @@ class LLMService {
                             val args = gson.fromJson(toolCall.function.arguments, Map::class.java)
                             val filePath = args["path"]?.toString() ?: ""
                             
-                            val fileTreeService = project?.service<com.c75.magiccodeinsert.services.FileTreeService>()
+                            val fileTreeService = project?.service<com.c75.magiccodecompletion.services.FileTreeService>()
                             val fileContent = fileTreeService?.readFile(filePath)
                             
                             val result = if (fileContent != null) {
@@ -340,7 +340,7 @@ class LLMService {
                                 }
                                 
                                 NotificationGroupManager.getInstance()
-                                    .getNotificationGroup("Magic Code Insert")
+                                    .getNotificationGroup("Magic Code Completion")
                                     .createNotification(
                                         "Tool Response",
                                         statusMsg,
@@ -396,7 +396,7 @@ class LLMService {
                     LOG.info(finalAnswerInfo)
                     
                     NotificationGroupManager.getInstance()
-                        .getNotificationGroup("Magic Code Insert")
+                        .getNotificationGroup("Magic Code Completion")
                         .createNotification(
                             "LLM Final Answer",
                             "Generated code ready (${assistantMessage.content?.length ?: 0} chars)",
@@ -415,7 +415,7 @@ class LLMService {
         throw LLMException("Maximum tool call iterations exceeded ($maxIterations)")
     }
     
-    private fun logDebugRequest(settings: MagicCodeInsertSettings.State, userMessage: String) {
+    private fun logDebugRequest(settings: MagicCodeCompletionSettings.State, userMessage: String) {
         val fullRequest = buildString {
             appendLine("=".repeat(80))
             appendLine("LLM REQUEST DEBUG")
@@ -443,7 +443,7 @@ class LLMService {
         }
         
         NotificationGroupManager.getInstance()
-            .getNotificationGroup("Magic Code Insert")
+            .getNotificationGroup("Magic Code Completion")
             .createNotification(
                 "LLM Request Debug",
                 "Request: ${preview}\n\nFull request logged to IDE log. Click to copy full request.",

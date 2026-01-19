@@ -1,1 +1,1 @@
-rootProject.name = "MagicCodeInsert"
+rootProject.name = "MagicCodeCompletion"

@@ -1,13 +1,13 @@
-package com.c75.magiccodeinsert.settings
+package com.c75.magiccodecompletion.settings
 
 import com.intellij.openapi.components.*
 
 @Service(Service.Level.APP)
 @State(
-    name = "MagicCodeInsertSettings",
-    storages = [Storage("MagicCodeInsertSettings.xml")]
+    name = "MagicCodeCompletionSettings",
+    storages = [Storage("MagicCodeCompletionSettings.xml")]
 )
-class MagicCodeInsertSettings : PersistentStateComponent<MagicCodeInsertSettings.State> {
+class MagicCodeCompletionSettings : PersistentStateComponent<MagicCodeCompletionSettings.State> {
     
     data class State(
         var apiEndpoint: String = "https://api.openai.com/v1/chat/completions",
@@ -80,6 +80,6 @@ YOUR WORKFLOW:
 3. When ready, call apply_edits() with all necessary changes
 4. DO NOT return plain text code - ALWAYS use apply_edits() tool to apply changes"""
         
-        fun getInstance(): MagicCodeInsertSettings = service()
+        fun getInstance(): MagicCodeCompletionSettings = service()
     }
 }

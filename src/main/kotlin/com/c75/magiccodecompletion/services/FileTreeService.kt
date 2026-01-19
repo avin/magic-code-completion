@@ -1,4 +1,4 @@
-package com.c75.magiccodeinsert.services
+package com.c75.magiccodecompletion.services
 
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.components.Service
@@ -25,7 +25,7 @@ class FileTreeService(private val project: Project) {
                 return@compute ""
             }
             
-            val settings = com.c75.magiccodeinsert.settings.MagicCodeInsertProjectSettings.getInstance(project).state
+            val settings = com.c75.magiccodecompletion.settings.MagicCodeCompletionProjectSettings.getInstance(project).state
             
             val matchers = includePatterns.map { pattern ->
                 val glob = "glob:$basePath/${pattern.trim()}"
