@@ -15,7 +15,7 @@ class FileTreeService(private val project: Project) {
     /**
      * Generate file tree for project, optionally filtered by include patterns.
      */
-    fun generateFileTree(includePatterns: List<String> = emptyList()): String {
+    fun generateFileTree(includePatterns: List<String> = emptyList(), currentFilePath: String? = null): String {
         return ReadAction.compute<String, RuntimeException> {
             val basePath = project.basePath ?: return@compute ""
             val baseVirtualFile = com.intellij.openapi.vfs.LocalFileSystem.getInstance()
@@ -42,7 +42,7 @@ class FileTreeService(private val project: Project) {
             
             val builder = StringBuilder()
             builder.append("PROJECT FILE TREE:\n\n")
-            buildTreeFromFiles(baseVirtualFile, basePath, "", matchingFiles, builder)
+            buildTreeFromFiles(baseVirtualFile, basePath, "", matchingFiles, currentFilePath, builder)
             builder.toString()
         }
     }
@@ -82,6 +82,7 @@ class FileTreeService(private val project: Project) {
         basePath: String,
         indent: String,
         matchingFiles: List<VirtualFile>,
+        currentFilePath: String?,
         builder: StringBuilder
     ) {
         if (!dir.isDirectory) return
@@ -107,11 +108,13 @@ class FileTreeService(private val project: Project) {
             
             if (child.isDirectory) {
                 builder.append(indent).append(prefix).append(child.name).append("/\n")
-                buildTreeFromFiles(child, basePath, childIndent, matchingFiles, builder)
+                buildTreeFromFiles(child, basePath, childIndent, matchingFiles, currentFilePath, builder)
             } else {
-                // Show file size
+                // Show file size and mark current file
+                val relativePath = child.path.removePrefix(basePath).removePrefix("/").removePrefix("\\")
                 val size = formatFileSize(child.length)
-                builder.append(indent).append(prefix).append(child.name).append(" ($size)\n")
+                val marker = if (currentFilePath != null && relativePath == currentFilePath) " ← CURRENT" else ""
+                builder.append(indent).append(prefix).append(child.name).append(" ($size)$marker\n")
             }
         }
     }

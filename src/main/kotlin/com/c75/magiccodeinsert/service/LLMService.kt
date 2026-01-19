@@ -144,7 +144,7 @@ class LLMService {
         var userMessage = buildString {
             if (project != null && settings.codeMapIncludePatterns.isNotEmpty()) {
                 val fileTreeService = project.service<com.c75.magiccodeinsert.services.FileTreeService>()
-                val fileTree = fileTreeService.generateFileTree(settings.codeMapIncludePatterns)
+                val fileTree = fileTreeService.generateFileTree(settings.codeMapIncludePatterns, currentFilePath)
                 if (fileTree.isNotBlank()) {
                     appendLine(fileTree)
                     appendLine()
