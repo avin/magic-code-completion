@@ -14,6 +14,9 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
+import com.intellij.openapi.util.TextRange
+import com.intellij.psi.PsiDocumentManager
+import com.intellij.psi.codeStyle.CodeStyleManager
 
 class InsertCodeFromLLMAction : AnAction() {
     
@@ -126,6 +129,7 @@ class InsertCodeFromLLMAction : AnAction() {
                 WriteCommandAction.runWriteCommandAction(project) {
                     var currentText = document.text
                     var cursorPosition = caretOffset
+                    val editedRanges = mutableListOf<TextRange>()
                     
                     // Apply edits sequentially
                     for (edit in editsData) {
@@ -135,6 +139,7 @@ class InsertCodeFromLLMAction : AnAction() {
                         if (search == CURSOR_MARKER) {
                             // Insert at cursor position
                             document.insertString(cursorPosition, replace)
+                            editedRanges.add(TextRange(cursorPosition, cursorPosition + replace.length))
                             cursorPosition += replace.length
                         } else {
                             // Remove cursor marker from search string since document doesn't have it
@@ -144,6 +149,7 @@ class InsertCodeFromLLMAction : AnAction() {
                             val searchIndex = currentText.indexOf(searchWithoutMarker)
                             if (searchIndex != -1) {
                                 document.replaceString(searchIndex, searchIndex + searchWithoutMarker.length, replace)
+                                editedRanges.add(TextRange(searchIndex, searchIndex + replace.length))
                                 
                                 // Update cursor if replacement happened before cursor position
                                 if (searchIndex < cursorPosition) {
@@ -154,6 +160,22 @@ class InsertCodeFromLLMAction : AnAction() {
                                 currentText = document.text
                             }
                         }
+                    }
+                    
+                    // Auto-format edited ranges
+                    val psiFile = PsiDocumentManager.getInstance(project).getPsiFile(document)
+                    if (psiFile != null) {
+                        val codeStyleManager = CodeStyleManager.getInstance(project)
+                        for (range in editedRanges) {
+                            try {
+                                codeStyleManager.reformatText(psiFile, range.startOffset, range.endOffset)
+                            } catch (e: Exception) {
+                                // Ignore formatting errors
+                            }
+                        }
+                        
+                        // Update cursor position after formatting (it might have shifted)
+                        cursorPosition = editor.caretModel.offset
                     }
                     
                     // Move cursor to final position
