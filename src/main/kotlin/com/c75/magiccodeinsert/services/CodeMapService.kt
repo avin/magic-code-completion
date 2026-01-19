@@ -25,7 +25,7 @@ class CodeMapService(private val project: Project) {
             
             val projectBasePath = project.basePath ?: return@compute ""
             val psiManager = PsiManager.getInstance(project)
-            val settings = com.c75.magiccodeinsert.settings.MagicCodeInsertSettings.getInstance().state
+            val settings = com.c75.magiccodeinsert.settings.MagicCodeInsertProjectSettings.getInstance(project).state
             
             // Collect all matching files
             val matchingFiles = collectMatchingFiles(

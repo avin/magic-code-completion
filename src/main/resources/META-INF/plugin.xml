@@ -35,7 +35,7 @@
         <notificationGroup id="Magic Code Insert" displayType="BALLOON"/>
         
         <!-- Settings page -->
-        <applicationConfigurable 
+        <projectConfigurable 
             parentId="tools"
             instance="com.c75.magiccodeinsert.settings.MagicCodeInsertConfigurable"
             id="com.c75.magiccodeinsert.settings.MagicCodeInsertConfigurable"
@@ -46,6 +46,7 @@
         <applicationService serviceImplementation="com.c75.magiccodeinsert.service.LLMService"/>
         
         <!-- Project-level services -->
+        <projectService serviceImplementation="com.c75.magiccodeinsert.settings.MagicCodeInsertProjectSettings"/>
         <projectService serviceImplementation="com.c75.magiccodeinsert.services.CodeMapService"/>
     </extensions>
     

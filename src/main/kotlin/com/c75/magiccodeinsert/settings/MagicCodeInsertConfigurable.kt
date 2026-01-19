@@ -1,13 +1,14 @@
 package com.c75.magiccodeinsert.settings
 
 import com.intellij.openapi.options.Configurable
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.ui.components.JBPasswordField
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.dsl.builder.*
 import javax.swing.JComponent
 
-class MagicCodeInsertConfigurable : Configurable {
+class MagicCodeInsertConfigurable(private val project: Project) : Configurable {
     
     private var settingsPanel: DialogPanel? = null
     
@@ -30,6 +31,7 @@ class MagicCodeInsertConfigurable : Configurable {
     
     override fun createComponent(): JComponent {
         val settings = MagicCodeInsertSettings.getInstance().state
+        val projectSettings = MagicCodeInsertProjectSettings.getInstance(project).state
         
         // Initialize fields with current settings
         apiEndpointField.text = settings.apiEndpoint
@@ -40,9 +42,9 @@ class MagicCodeInsertConfigurable : Configurable {
         connectTimeoutValue = settings.connectTimeout
         readTimeoutValue = settings.readTimeout
         writeTimeoutValue = settings.writeTimeout
-        codeMapPatternsText = settings.codeMapIncludePatterns.joinToString("\n")
-        excludeFilesEnabled = settings.excludeFiles
-        excludePatternsText = settings.excludePatterns.joinToString("\n")
+        codeMapPatternsText = projectSettings.codeMapIncludePatterns.joinToString("\n")
+        excludeFilesEnabled = projectSettings.excludeFiles
+        excludePatternsText = projectSettings.excludePatterns.joinToString("\n")
         systemPromptContent = settings.systemPrompt
         debugModeEnabled = settings.debugMode
         
@@ -152,6 +154,7 @@ class MagicCodeInsertConfigurable : Configurable {
     
     override fun isModified(): Boolean {
         val settings = MagicCodeInsertSettings.getInstance().state
+        val projectSettings = MagicCodeInsertProjectSettings.getInstance(project).state
         val panelModified = settingsPanel?.isModified() ?: false
         return panelModified ||
                 apiEndpointField.text != settings.apiEndpoint ||
@@ -163,6 +166,8 @@ class MagicCodeInsertConfigurable : Configurable {
     override fun apply() {
         settingsPanel?.apply()
         val settings = MagicCodeInsertSettings.getInstance().state
+        val projectSettings = MagicCodeInsertProjectSettings.getInstance(project).state
+        
         settings.apiEndpoint = apiEndpointField.text
         settings.apiKey = String(apiKeyField.password)
         settings.model = modelField.text
@@ -171,23 +176,26 @@ class MagicCodeInsertConfigurable : Configurable {
         settings.connectTimeout = connectTimeoutValue
         settings.readTimeout = readTimeoutValue
         settings.writeTimeout = writeTimeoutValue
-        settings.excludeFiles = excludeFilesEnabled
-        settings.codeMapIncludePatterns = codeMapPatternsText
-            .lineSequence()
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .toMutableList()
-        settings.excludePatterns = excludePatternsText
-            .lineSequence()
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .toMutableList()
         settings.systemPrompt = systemPromptContent
         settings.debugMode = debugModeEnabled
+        
+        projectSettings.excludeFiles = excludeFilesEnabled
+        projectSettings.codeMapIncludePatterns = codeMapPatternsText
+            .lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .toMutableList()
+        projectSettings.excludePatterns = excludePatternsText
+            .lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .toMutableList()
     }
     
     override fun reset() {
         val settings = MagicCodeInsertSettings.getInstance().state
+        val projectSettings = MagicCodeInsertProjectSettings.getInstance(project).state
+        
         apiEndpointField.text = settings.apiEndpoint
         apiKeyField.text = settings.apiKey
         modelField.text = settings.model
@@ -196,9 +204,9 @@ class MagicCodeInsertConfigurable : Configurable {
         connectTimeoutValue = settings.connectTimeout
         readTimeoutValue = settings.readTimeout
         writeTimeoutValue = settings.writeTimeout
-        codeMapPatternsText = settings.codeMapIncludePatterns.joinToString("\n")
-        excludeFilesEnabled = settings.excludeFiles
-        excludePatternsText = settings.excludePatterns.joinToString("\n")
+        codeMapPatternsText = projectSettings.codeMapIncludePatterns.joinToString("\n")
+        excludeFilesEnabled = projectSettings.excludeFiles
+        excludePatternsText = projectSettings.excludePatterns.joinToString("\n")
         debugModeEnabled = settings.debugMode
         systemPromptContent = settings.systemPrompt
         settingsPanel?.reset()
