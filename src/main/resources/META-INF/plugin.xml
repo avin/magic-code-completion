@@ -13,13 +13,18 @@
     <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-description -->
     <description><![CDATA[
-        A plugin that sends code to LLM (OpenAI-compatible API) and inserts generated code at cursor position.<br>
-        <em>Features:</em>
+        AI-assisted code completion plugin using OpenAI-compatible APIs with agentic file reading and multi-edit capabilities.<br>
+        <br>
+        <em>Key Features:</em>
         <ul>
-            <li>Configurable OpenAI-compatible API endpoint</li>
-            <li>Customizable system prompt</li>
-            <li>Hotkey support for quick code insertion</li>
-            <li>Cursor position marked with &lt;&lt;&lt;CURSOR&gt;&gt;&gt; in the request</li>
+            <li><strong>Alt+I hotkey</strong> - Quick code completion at cursor position</li>
+            <li><strong>Agentic file access</strong> - LLM can dynamically request and read project files via function calling</li>
+            <li><strong>Multi-edit support</strong> - Apply multiple code changes (imports, refactoring, insertion) in a single request</li>
+            <li><strong>Auto-formatting</strong> - Automatically formats inserted/modified code</li>
+            <li><strong>Project-aware context</strong> - File tree with current file marker</li>
+            <li><strong>Flexible configuration</strong> - Works with any OpenAI-compatible API (OpenAI, local LLMs, etc.)</li>
+            <li><strong>Per-project file patterns</strong> - Customizable include/exclude patterns for context</li>
+            <li><strong>Debug mode</strong> - Optional request/response logging</li>
         </ul>
     ]]></description>
 
@@ -47,7 +52,7 @@
         
         <!-- Project-level services -->
         <projectService serviceImplementation="com.c75.magiccodeinsert.settings.MagicCodeInsertProjectSettings"/>
-        <projectService serviceImplementation="com.c75.magiccodeinsert.services.CodeMapService"/>
+        <projectService serviceImplementation="com.c75.magiccodeinsert.services.FileTreeService"/>
     </extensions>
     
     <!-- Actions -->
