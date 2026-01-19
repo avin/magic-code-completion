@@ -64,12 +64,41 @@ class LLMService {
         val messages: List<Message>,
         val temperature: Double,
         @SerializedName("max_tokens")
-        val maxTokens: Int
+        val maxTokens: Int,
+        val tools: List<Tool>? = null,
+        @SerializedName("tool_choice")
+        val toolChoice: String? = null
     )
     
     data class Message(
         val role: String,
-        val content: String
+        val content: String? = null,
+        @SerializedName("tool_calls")
+        val toolCalls: List<ToolCall>? = null,
+        @SerializedName("tool_call_id")
+        val toolCallId: String? = null
+    )
+    
+    data class Tool(
+        val type: String = "function",
+        val function: FunctionDef
+    )
+    
+    data class FunctionDef(
+        val name: String,
+        val description: String,
+        val parameters: Map<String, Any>
+    )
+    
+    data class ToolCall(
+        val id: String,
+        val type: String,
+        val function: FunctionCall
+    )
+    
+    data class FunctionCall(
+        val name: String,
+        val arguments: String
     )
     
     data class ChatResponse(
@@ -92,7 +121,7 @@ class LLMService {
     /**
      * Send code with cursor marker to LLM and get completion
      * @param codeWithCursor The code with <<<CURSOR>>> marker
-     * @param project Current project (for code map generation)
+     * @param project Current project (for file tree and reading files)
      * @param currentFilePath Current file path relative to project root
      * @param settingsState Optional settings state (for testing)
      * @return Generated code to insert at cursor position
@@ -111,80 +140,88 @@ class LLMService {
             throw LLMException("API key is not configured. Please set it in Settings > Magic Code Insert")
         }
         
-        // Generate code map if patterns are configured
-        var userMessage = codeWithCursor
-        if (project != null && settings.codeMapIncludePatterns.isNotEmpty()) {
-            val codeMapService = project.service<com.c75.magiccodeinsert.services.CodeMapService>()
-            val codeMap = codeMapService.generateCodeMap(settings.codeMapIncludePatterns, currentFilePath)
-            if (codeMap.isNotBlank()) {
-                userMessage = codeMap + codeWithCursor
+        // Build initial user message with file tree
+        var userMessage = buildString {
+            if (project != null && settings.codeMapIncludePatterns.isNotEmpty()) {
+                val fileTreeService = project.service<com.c75.magiccodeinsert.services.FileTreeService>()
+                val fileTree = fileTreeService.generateFileTree(settings.codeMapIncludePatterns)
+                if (fileTree.isNotBlank()) {
+                    appendLine(fileTree)
+                    appendLine()
+                }
             }
+            
+            if (currentFilePath != null) {
+                appendLine("CURRENT FILE: $currentFilePath")
+                appendLine()
+            }
+            
+            appendLine("CURRENT CODE:")
+            append(codeWithCursor)
         }
         
-        val chatRequest = ChatRequest(
-            model = settings.model,
-            messages = listOf(
-                Message(role = "system", content = settings.systemPrompt),
-                Message(role = "user", content = userMessage)
-            ),
-            temperature = settings.temperature,
-            maxTokens = settings.maxTokens
+        // Define available tools
+        val tools = if (project != null) {
+            listOf(
+                Tool(
+                    function = FunctionDef(
+                        name = "read_file",
+                        description = "Read the content of a file from the project. Use this to examine files that might be relevant for generating the code.",
+                        parameters = mapOf(
+                            "type" to "object",
+                            "properties" to mapOf(
+                                "path" to mapOf(
+                                    "type" to "string",
+                                    "description" to "File path relative to project root (e.g., 'src/utils/api.ts')"
+                                )
+                            ),
+                            "required" to listOf("path")
+                        )
+                    )
+                )
+            )
+        } else {
+            null
+        }
+        
+        // Conversation messages
+        val messages = mutableListOf<Message>(
+            Message(role = "system", content = settings.systemPrompt),
+            Message(role = "user", content = userMessage)
         )
         
-        val requestBody = gson.toJson(chatRequest).toRequestBody(JSON_MEDIA_TYPE)
+        // Tool call loop - max 10 iterations to prevent infinite loops
+        var iteration = 0
+        val maxIterations = 10
         
-        // Debug logging if enabled
-        if (settings.debugMode) {
-            val fullRequest = buildString {
-                appendLine("=".repeat(80))
-                appendLine("LLM REQUEST DEBUG")
-                appendLine("=".repeat(80))
-                appendLine("Endpoint: ${settings.apiEndpoint}")
-                appendLine("Model: ${settings.model}")
-                appendLine("Temperature: ${settings.temperature}")
-                appendLine("Max Tokens: ${settings.maxTokens}")
-                appendLine("-".repeat(80))
-                appendLine("System Prompt:")
-                appendLine(settings.systemPrompt)
-                appendLine("-".repeat(80))
-                appendLine("User Message:")
-                appendLine(userMessage)
-                appendLine("=".repeat(80))
+        while (iteration < maxIterations) {
+            iteration++
+            
+            val chatRequest = ChatRequest(
+                model = settings.model,
+                messages = messages,
+                temperature = settings.temperature,
+                maxTokens = settings.maxTokens,
+                tools = tools
+            )
+            
+            val requestBody = gson.toJson(chatRequest).toRequestBody(JSON_MEDIA_TYPE)
+            
+            // Debug logging if enabled
+            if (settings.debugMode && iteration == 1) {
+                logDebugRequest(settings, userMessage)
             }
             
-            LOG.info(fullRequest)
+            val request = Request.Builder()
+                .url(settings.apiEndpoint)
+                .addHeader("Authorization", "Bearer ${settings.apiKey}")
+                .addHeader("Content-Type", "application/json")
+                .post(requestBody)
+                .build()
             
-            // Show notification with copy button
-            val preview = if (userMessage.length > 500) {
-                userMessage.substring(0, 500) + "... (${userMessage.length} chars total)"
-            } else {
-                userMessage
-            }
+            val client = createClient(settings)
+            val response = client.newCall(request).execute()
             
-            NotificationGroupManager.getInstance()
-                .getNotificationGroup("Magic Code Insert")
-                .createNotification(
-                    "LLM Request Debug",
-                    "Request: ${preview}\n\nFull request logged to IDE log. Click to copy full request.",
-                    NotificationType.INFORMATION
-                )
-                .addAction(object : com.intellij.openapi.actionSystem.AnAction("Copy Full Request") {
-                    override fun actionPerformed(e: com.intellij.openapi.actionSystem.AnActionEvent) {
-                        CopyPasteManager.getInstance().setContents(StringSelection(fullRequest))
-                    }
-                })
-                .notify(null)
-        }
-        
-        val request = Request.Builder()
-            .url(settings.apiEndpoint)
-            .addHeader("Authorization", "Bearer ${settings.apiKey}")
-            .addHeader("Content-Type", "application/json")
-            .post(requestBody)
-            .build()
-        
-        val client = createClient(settings)
-        client.newCall(request).execute().use { response ->
             val responseBody = response.body?.string()
                 ?: throw LLMException("Empty response from API")
             
@@ -206,11 +243,93 @@ class LLMService {
                 throw LLMException("API error: ${chatResponse.error.message}")
             }
             
-            val completion = chatResponse.choices?.firstOrNull()?.message?.content
+            val choice = chatResponse.choices?.firstOrNull()
                 ?: throw LLMException("No completion in response")
             
-            return completion.trim()
+            val assistantMessage = choice.message
+            
+            // Check if LLM wants to use tools
+            if (assistantMessage.toolCalls != null && assistantMessage.toolCalls.isNotEmpty()) {
+                // Add assistant message with tool calls
+                messages.add(assistantMessage)
+                
+                // Process each tool call
+                for (toolCall in assistantMessage.toolCalls) {
+                    if (toolCall.function.name == "read_file") {
+                        val args = gson.fromJson(toolCall.function.arguments, Map::class.java)
+                        val filePath = args["path"]?.toString() ?: ""
+                        
+                        val fileTreeService = project?.service<com.c75.magiccodeinsert.services.FileTreeService>()
+                        val fileContent = fileTreeService?.readFile(filePath)
+                        
+                        val result = if (fileContent != null) {
+                            "Content of $filePath:\n\n$fileContent"
+                        } else {
+                            "Error: File not found or cannot be read: $filePath"
+                        }
+                        
+                        // Add tool response
+                        messages.add(Message(
+                            role = "tool",
+                            content = result,
+                            toolCallId = toolCall.id
+                        ))
+                    }
+                }
+                
+                // Continue loop to get next response
+            } else {
+                // No tool calls - return final answer
+                val completion = assistantMessage.content
+                    ?: throw LLMException("No completion in response")
+                
+                return completion.trim()
+            }
         }
+        
+        throw LLMException("Maximum tool call iterations exceeded ($maxIterations)")
+    }
+    
+    private fun logDebugRequest(settings: MagicCodeInsertSettings.State, userMessage: String) {
+        val fullRequest = buildString {
+            appendLine("=".repeat(80))
+            appendLine("LLM REQUEST DEBUG")
+            appendLine("=".repeat(80))
+            appendLine("Endpoint: ${settings.apiEndpoint}")
+            appendLine("Model: ${settings.model}")
+            appendLine("Temperature: ${settings.temperature}")
+            appendLine("Max Tokens: ${settings.maxTokens}")
+            appendLine("-".repeat(80))
+            appendLine("System Prompt:")
+            appendLine(settings.systemPrompt)
+            appendLine("-".repeat(80))
+            appendLine("User Message:")
+            appendLine(userMessage)
+            appendLine("=".repeat(80))
+        }
+        
+        LOG.info(fullRequest)
+        
+        // Show notification with copy button
+        val preview = if (userMessage.length > 500) {
+            userMessage.substring(0, 500) + "... (${userMessage.length} chars total)"
+        } else {
+            userMessage
+        }
+        
+        NotificationGroupManager.getInstance()
+            .getNotificationGroup("Magic Code Insert")
+            .createNotification(
+                "LLM Request Debug",
+                "Request: ${preview}\n\nFull request logged to IDE log. Click to copy full request.",
+                NotificationType.INFORMATION
+            )
+            .addAction(object : com.intellij.openapi.actionSystem.AnAction("Copy Full Request") {
+                override fun actionPerformed(e: com.intellij.openapi.actionSystem.AnActionEvent) {
+                    CopyPasteManager.getInstance().setContents(StringSelection(fullRequest))
+                }
+            })
+            .notify(null)
     }
     
     class LLMException(message: String, cause: Throwable? = null) : Exception(message, cause)
