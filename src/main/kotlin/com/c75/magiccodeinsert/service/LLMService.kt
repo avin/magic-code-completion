@@ -253,6 +253,33 @@ class LLMService {
                 // Add assistant message with tool calls
                 messages.add(assistantMessage)
                 
+                // Debug: log tool calls
+                if (settings.debugMode) {
+                    val toolCallsInfo = buildString {
+                        appendLine("=".repeat(80))
+                        appendLine("LLM TOOL CALLS (Iteration $iteration)")
+                        appendLine("=".repeat(80))
+                        assistantMessage.toolCalls.forEach { toolCall ->
+                            appendLine("Tool: ${toolCall.function.name}")
+                            appendLine("Arguments: ${toolCall.function.arguments}")
+                        }
+                        appendLine("=".repeat(80))
+                    }
+                    LOG.info(toolCallsInfo)
+                    
+                    val toolCallsSummary = assistantMessage.toolCalls
+                        .joinToString(", ") { it.function.name + "(${it.function.arguments})" }
+                    
+                    NotificationGroupManager.getInstance()
+                        .getNotificationGroup("Magic Code Insert")
+                        .createNotification(
+                            "LLM Tool Calls",
+                            "Iteration $iteration: $toolCallsSummary",
+                            NotificationType.INFORMATION
+                        )
+                        .notify(null)
+                }
+                
                 // Process each tool call
                 for (toolCall in assistantMessage.toolCalls) {
                     if (toolCall.function.name == "read_file") {
@@ -268,6 +295,43 @@ class LLMService {
                             "Error: File not found or cannot be read: $filePath"
                         }
                         
+                        // Debug: log tool response
+                        if (settings.debugMode) {
+                            val toolResponseInfo = buildString {
+                                appendLine("-".repeat(80))
+                                appendLine("TOOL RESPONSE: read_file")
+                                appendLine("-".repeat(80))
+                                appendLine("File: $filePath")
+                                appendLine("Status: ${if (fileContent != null) "SUCCESS" else "ERROR"}")
+                                if (fileContent != null) {
+                                    appendLine("Size: ${fileContent.length} chars")
+                                    appendLine("-".repeat(80))
+                                    appendLine("Content Preview (first 500 chars):")
+                                    appendLine(fileContent.take(500))
+                                    if (fileContent.length > 500) {
+                                        appendLine("... (${fileContent.length - 500} more chars)")
+                                    }
+                                }
+                                appendLine("-".repeat(80))
+                            }
+                            LOG.info(toolResponseInfo)
+                            
+                            val statusMsg = if (fileContent != null) {
+                                "✓ Sent $filePath (${fileContent.length} chars)"
+                            } else {
+                                "✗ File not found: $filePath"
+                            }
+                            
+                            NotificationGroupManager.getInstance()
+                                .getNotificationGroup("Magic Code Insert")
+                                .createNotification(
+                                    "Tool Response",
+                                    statusMsg,
+                                    if (fileContent != null) NotificationType.INFORMATION else NotificationType.WARNING
+                                )
+                                .notify(null)
+                        }
+                        
                         // Add tool response
                         messages.add(Message(
                             role = "tool",
@@ -280,6 +344,26 @@ class LLMService {
                 // Continue loop to get next response
             } else {
                 // No tool calls - return final answer
+                if (settings.debugMode) {
+                    val finalAnswerInfo = buildString {
+                        appendLine("=".repeat(80))
+                        appendLine("LLM FINAL ANSWER (Iteration $iteration)")
+                        appendLine("=".repeat(80))
+                        appendLine(assistantMessage.content ?: "")
+                        appendLine("=".repeat(80))
+                    }
+                    LOG.info(finalAnswerInfo)
+                    
+                    NotificationGroupManager.getInstance()
+                        .getNotificationGroup("Magic Code Insert")
+                        .createNotification(
+                            "LLM Final Answer",
+                            "Generated code ready (${assistantMessage.content?.length ?: 0} chars)",
+                            NotificationType.INFORMATION
+                        )
+                        .notify(null)
+                }
+                
                 val completion = assistantMessage.content
                     ?: throw LLMException("No completion in response")
                 
