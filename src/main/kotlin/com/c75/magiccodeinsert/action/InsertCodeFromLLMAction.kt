@@ -19,9 +19,12 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.codeStyle.CodeStyleManager
+import java.awt.event.KeyAdapter
+import java.awt.event.KeyEvent
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 class InsertCodeFromLLMAction : AnAction() {
@@ -30,8 +33,17 @@ class InsertCodeFromLLMAction : AnAction() {
         const val CURSOR_MARKER = "<<<CURSOR>>>"
         const val APPLY_EDITS_PREFIX = "APPLY_EDITS:"
         
-        // ASCII spinner frames (compatible with JetBrains Mono)
-        private val SPINNER_FRAMES = arrayOf("|", "/", "-", "\\")
+        // ASCII spinner frames (brackets progress bar)
+        private val SPINNER_FRAMES = arrayOf(
+            "[    ]",
+            "[=   ]",
+            "[==  ]",
+            "[=== ]",
+            "[====]",
+            "[ ===]",
+            "[  ==]",
+            "[   =]"
+        )
         private val scheduler = Executors.newScheduledThreadPool(1)
     }
     
@@ -72,8 +84,21 @@ class InsertCodeFromLLMAction : AnAction() {
         var inlayHint: Inlay<*>? = null
         val frameIndex = AtomicInteger(0)
         var animationTask: ScheduledFuture<*>? = null
+        val cancelled = AtomicBoolean(false)
+        
+        // ESC key listener to cancel generation
+        val escKeyListener = object : KeyAdapter() {
+            override fun keyPressed(e: KeyEvent) {
+                if (e.keyCode == KeyEvent.VK_ESCAPE && !cancelled.get()) {
+                    cancelled.set(true)
+                    e.consume()
+                }
+            }
+        }
         
         ApplicationManager.getApplication().invokeLater {
+            editor.contentComponent.addKeyListener(escKeyListener)
+            
             inlayHint = editor.inlayModel.addInlineElement(
                 caretOffset,
                 true,
@@ -96,7 +121,7 @@ class InsertCodeFromLLMAction : AnAction() {
                     
                     private fun getCurrentSpinnerText(): String {
                         val frame = SPINNER_FRAMES[frameIndex.get() % SPINNER_FRAMES.size]
-                        return "$frame Generating code..."
+                        return "$frame Generating code... (ESC to cancel)"
                     }
                 }
             )
@@ -125,7 +150,18 @@ class InsertCodeFromLLMAction : AnAction() {
                 
                 try {
                     val llmService = LLMService.getInstance()
-                    generatedCode = llmService.getCodeCompletion(codeWithCursor, project, currentFilePath)
+                    
+                    // Check for cancellation during execution
+                    while (!indicator.isCanceled && !cancelled.get()) {
+                        // Start request in chunks to allow cancellation checks
+                        // For now, we'll just do the request and check after
+                        generatedCode = llmService.getCodeCompletion(codeWithCursor, project, currentFilePath)
+                        break
+                    }
+                    
+                    if (cancelled.get()) {
+                        indicator.cancel()
+                    }
                 } catch (e: LLMService.LLMException) {
                     error = e.message
                 } catch (e: Exception) {
@@ -137,7 +173,13 @@ class InsertCodeFromLLMAction : AnAction() {
                 // Stop animation and remove hint
                 animationTask?.cancel(false)
                 ApplicationManager.getApplication().invokeLater {
+                    editor.contentComponent.removeKeyListener(escKeyListener)
                     inlayHint?.let { Disposer.dispose(it) }
+                }
+                
+                // Check if cancelled
+                if (cancelled.get()) {
+                    return
                 }
                 
                 if (error != null) {
@@ -167,6 +209,7 @@ class InsertCodeFromLLMAction : AnAction() {
                 // Stop animation and remove hint
                 animationTask?.cancel(false)
                 ApplicationManager.getApplication().invokeLater {
+                    editor.contentComponent.removeKeyListener(escKeyListener)
                     inlayHint?.let { Disposer.dispose(it) }
                 }
                 
@@ -175,6 +218,15 @@ class InsertCodeFromLLMAction : AnAction() {
                     "Failed to get code completion: ${throwable.message}",
                     "Error"
                 )
+            }
+            
+            override fun onCancel() {
+                // Stop animation and remove hint
+                animationTask?.cancel(false)
+                ApplicationManager.getApplication().invokeLater {
+                    editor.contentComponent.removeKeyListener(escKeyListener)
+                    inlayHint?.let { Disposer.dispose(it) }
+                }
             }
         })
     }
