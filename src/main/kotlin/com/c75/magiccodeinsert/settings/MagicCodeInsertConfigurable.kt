@@ -1,8 +1,10 @@
 package com.c75.magiccodeinsert.settings
 
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogPanel
+import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPasswordField
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.dsl.builder.*
@@ -98,7 +100,8 @@ class MagicCodeInsertConfigurable(private val project: Project) : Configurable {
                 }
             }
             
-            group("Project Files (Context for LLM)") {
+            val projectFilesLabel = JBLabel("Project Files (Context for LLM)", AllIcons.General.ProjectConfigurable, JBLabel.TRAILING)
+            group(projectFilesLabel) {
                 row {
                     textArea()
                         .rows(5)

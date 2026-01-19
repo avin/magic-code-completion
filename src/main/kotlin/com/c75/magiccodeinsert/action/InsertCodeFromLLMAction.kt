@@ -134,13 +134,23 @@ class InsertCodeFromLLMAction : AnAction() {
                     // Apply edits sequentially
                     for (edit in editsData) {
                         val search = edit["search"] ?: continue
-                        val replace = edit["replace"] ?: ""
+                        val rawReplace = edit["replace"] ?: ""
+                        
+                        // Check if replace contains cursor marker - remember position and remove it
+                        val cursorInReplace = rawReplace.indexOf(CURSOR_MARKER)
+                        val replace = rawReplace.replace(CURSOR_MARKER, "")
                         
                         if (search == CURSOR_MARKER) {
                             // Insert at cursor position
                             document.insertString(cursorPosition, replace)
                             editedRanges.add(TextRange(cursorPosition, cursorPosition + replace.length))
-                            cursorPosition += replace.length
+                            
+                            // If replace had cursor marker, position cursor there, otherwise at end of insert
+                            cursorPosition = if (cursorInReplace != -1) {
+                                cursorPosition + cursorInReplace
+                            } else {
+                                cursorPosition + replace.length
+                            }
                         } else {
                             // Remove cursor marker from search string since document doesn't have it
                             val searchWithoutMarker = search.replace(CURSOR_MARKER, "")
@@ -151,9 +161,15 @@ class InsertCodeFromLLMAction : AnAction() {
                                 document.replaceString(searchIndex, searchIndex + searchWithoutMarker.length, replace)
                                 editedRanges.add(TextRange(searchIndex, searchIndex + replace.length))
                                 
-                                // Update cursor if replacement happened before cursor position
+                                // Update cursor position
                                 if (searchIndex < cursorPosition) {
+                                    // Replacement happened before cursor - adjust for size difference
                                     cursorPosition += (replace.length - searchWithoutMarker.length)
+                                }
+                                
+                                // If replace had cursor marker, position cursor at that offset
+                                if (cursorInReplace != -1) {
+                                    cursorPosition = searchIndex + cursorInReplace
                                 }
                                 
                                 // Update current text for next search
