@@ -1,6 +1,7 @@
 package com.c75.magiccodeinsert.action
 
 import com.c75.magiccodeinsert.service.LLMService
+import com.google.gson.Gson
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -18,7 +19,10 @@ class InsertCodeFromLLMAction : AnAction() {
     
     companion object {
         const val CURSOR_MARKER = "<<<CURSOR>>>"
+        const val APPLY_EDITS_PREFIX = "APPLY_EDITS:"
     }
+    
+    private val gson = Gson()
     
     override fun getActionUpdateThread(): ActionUpdateThread {
         return ActionUpdateThread.BGT
@@ -82,12 +86,18 @@ class InsertCodeFromLLMAction : AnAction() {
                 
                 val code = generatedCode ?: return
                 
-                // Insert generated code at cursor position
-                ApplicationManager.getApplication().invokeLater {
-                    WriteCommandAction.runWriteCommandAction(project) {
-                        document.insertString(caretOffset, code)
-                        // Move cursor to end of inserted text
-                        caretModel.moveToOffset(caretOffset + code.length)
+                // Check if this is apply_edits response
+                if (code.startsWith(APPLY_EDITS_PREFIX)) {
+                    val editsJson = code.removePrefix(APPLY_EDITS_PREFIX)
+                    applyEdits(project, editor, document, editsJson, caretOffset)
+                } else {
+                    // Simple insertion at cursor (legacy behavior)
+                    ApplicationManager.getApplication().invokeLater {
+                        WriteCommandAction.runWriteCommandAction(project) {
+                            document.insertString(caretOffset, code)
+                            // Move cursor to end of inserted text
+                            caretModel.moveToOffset(caretOffset + code.length)
+                        }
                     }
                 }
             }
@@ -100,5 +110,62 @@ class InsertCodeFromLLMAction : AnAction() {
                 )
             }
         })
+    }
+    
+    private fun applyEdits(
+        project: Project,
+        editor: Editor,
+        document: com.intellij.openapi.editor.Document,
+        editsJson: String,
+        caretOffset: Int
+    ) {
+        try {
+            val editsData = gson.fromJson(editsJson, List::class.java) as List<Map<String, String>>
+            
+            ApplicationManager.getApplication().invokeLater {
+                WriteCommandAction.runWriteCommandAction(project) {
+                    var currentText = document.text
+                    var cursorPosition = caretOffset
+                    
+                    // Apply edits sequentially
+                    for (edit in editsData) {
+                        val search = edit["search"] ?: continue
+                        val replace = edit["replace"] ?: ""
+                        
+                        if (search == CURSOR_MARKER) {
+                            // Insert at cursor position
+                            document.insertString(cursorPosition, replace)
+                            cursorPosition += replace.length
+                        } else {
+                            // Remove cursor marker from search string since document doesn't have it
+                            val searchWithoutMarker = search.replace(CURSOR_MARKER, "")
+                            
+                            // Find and replace in current text
+                            val searchIndex = currentText.indexOf(searchWithoutMarker)
+                            if (searchIndex != -1) {
+                                document.replaceString(searchIndex, searchIndex + searchWithoutMarker.length, replace)
+                                
+                                // Update cursor if replacement happened before cursor position
+                                if (searchIndex < cursorPosition) {
+                                    cursorPosition += (replace.length - searchWithoutMarker.length)
+                                }
+                                
+                                // Update current text for next search
+                                currentText = document.text
+                            }
+                        }
+                    }
+                    
+                    // Move cursor to final position
+                    editor.caretModel.moveToOffset(cursorPosition)
+                }
+            }
+        } catch (e: Exception) {
+            Messages.showErrorDialog(
+                project,
+                "Failed to apply edits: ${e.message}",
+                "Error"
+            )
+        }
     }
 }

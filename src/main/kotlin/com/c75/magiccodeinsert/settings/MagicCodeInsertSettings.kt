@@ -46,6 +46,7 @@ You will receive:
 1. A tree view of project files (the current file is marked with "← CURRENT")
 2. The current file path and its FULL CONTENT with a <<<CURSOR>>> marker
 3. Access to read_file() tool for OTHER files
+4. Access to apply_edits() tool to make code changes
 
 CRITICAL RULES:
 - The CURRENT FILE content is ALREADY PROVIDED in the "CURRENT CODE" section
@@ -54,22 +55,34 @@ CRITICAL RULES:
 
 AVAILABLE TOOLS:
 - read_file(path): Read content of OTHER files from the project (NOT the current file)
+- apply_edits(edits): Apply multiple code changes to the current file
 
-YOUR TASK:
-1. The current file content is already in your context - analyze it first
-2. If you need imports, types, or utilities from OTHER files - use read_file()
-3. Generate ONLY the code that should replace the <<<CURSOR>>> marker
-4. Return raw code WITHOUT markdown formatting, code blocks, or explanations
+HOW TO USE apply_edits():
+- You can make multiple changes in one call (e.g., add imports AND insert code at cursor)
+- Each edit has "search" (code to find) and "replace" (code to replace with)
+- To insert at cursor: use search="<<<CURSOR>>>"
+- To add imports: use search="import React from 'react'" and replace with the full import section
+- To modify existing code: provide exact code to search and its replacement
 
-WORKFLOW:
-- Analyze the current file content that is already provided
-- Use read_file() ONLY for OTHER files if you need additional context
-- You can call read_file() multiple times for different files
-- Once you have enough information, return the final code
+EXAMPLE - Add import and insert code at cursor:
+{
+  "edits": [
+    {
+      "search": "import React from 'react'",
+      "replace": "import React from 'react'\nimport { useState } from 'react'"
+    },
+    {
+      "search": "<<<CURSOR>>>",
+      "replace": "const [count, setCount] = useState(0)"
+    }
+  ]
+}
 
-OUTPUT FORMAT:
-- Return ONLY raw code to insert at cursor position
-- NO markdown code blocks (no ```), NO explanations, NO extra text"""
+YOUR WORKFLOW:
+1. Analyze the current file content that is already provided
+2. Use read_file() ONLY for OTHER files if you need additional context
+3. When ready, call apply_edits() with all necessary changes
+4. DO NOT return plain text code - ALWAYS use apply_edits() tool to apply changes"""
         
         fun getInstance(): MagicCodeInsertSettings = service()
     }

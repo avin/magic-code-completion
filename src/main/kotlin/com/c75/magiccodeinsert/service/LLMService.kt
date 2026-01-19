@@ -178,6 +178,36 @@ class LLMService {
                             "required" to listOf("path")
                         )
                     )
+                ),
+                Tool(
+                    function = FunctionDef(
+                        name = "apply_edits",
+                        description = "Apply multiple code edits to the current file. Use this to insert imports, add code at cursor, or make other changes. If you need to insert code at the cursor position, use search='<<<CURSOR>>>'.",
+                        parameters = mapOf(
+                            "type" to "object",
+                            "properties" to mapOf(
+                                "edits" to mapOf(
+                                    "type" to "array",
+                                    "description" to "List of edits to apply",
+                                    "items" to mapOf(
+                                        "type" to "object",
+                                        "properties" to mapOf(
+                                            "search" to mapOf(
+                                                "type" to "string",
+                                                "description" to "Exact code to find and replace. Use '<<<CURSOR>>>' to insert at cursor position."
+                                            ),
+                                            "replace" to mapOf(
+                                                "type" to "string",
+                                                "description" to "Code to replace with"
+                                            )
+                                        ),
+                                        "required" to listOf("search", "replace")
+                                    )
+                                )
+                            ),
+                            "required" to listOf("edits")
+                        )
+                    )
                 )
             )
         } else {
@@ -282,62 +312,87 @@ class LLMService {
                 
                 // Process each tool call
                 for (toolCall in assistantMessage.toolCalls) {
-                    if (toolCall.function.name == "read_file") {
-                        val args = gson.fromJson(toolCall.function.arguments, Map::class.java)
-                        val filePath = args["path"]?.toString() ?: ""
-                        
-                        val fileTreeService = project?.service<com.c75.magiccodeinsert.services.FileTreeService>()
-                        val fileContent = fileTreeService?.readFile(filePath)
-                        
-                        val result = if (fileContent != null) {
-                            "Content of $filePath:\n\n$fileContent"
-                        } else {
-                            "Error: File not found or cannot be read: $filePath"
-                        }
-                        
-                        // Debug: log tool response
-                        if (settings.debugMode) {
-                            val toolResponseInfo = buildString {
-                                appendLine("-".repeat(80))
-                                appendLine("TOOL RESPONSE: read_file")
-                                appendLine("-".repeat(80))
-                                appendLine("File: $filePath")
-                                appendLine("Status: ${if (fileContent != null) "SUCCESS" else "ERROR"}")
-                                if (fileContent != null) {
-                                    appendLine("Size: ${fileContent.length} chars")
-                                    appendLine("-".repeat(80))
-                                    appendLine("Content Preview (first 500 chars):")
-                                    appendLine(fileContent.take(500))
-                                    if (fileContent.length > 500) {
-                                        appendLine("... (${fileContent.length - 500} more chars)")
-                                    }
-                                }
-                                appendLine("-".repeat(80))
-                            }
-                            LOG.info(toolResponseInfo)
+                    when (toolCall.function.name) {
+                        "read_file" -> {
+                            val args = gson.fromJson(toolCall.function.arguments, Map::class.java)
+                            val filePath = args["path"]?.toString() ?: ""
                             
-                            val statusMsg = if (fileContent != null) {
-                                "✓ Sent $filePath (${fileContent.length} chars)"
+                            val fileTreeService = project?.service<com.c75.magiccodeinsert.services.FileTreeService>()
+                            val fileContent = fileTreeService?.readFile(filePath)
+                            
+                            val result = if (fileContent != null) {
+                                "Content of $filePath:\n\n$fileContent"
                             } else {
-                                "✗ File not found: $filePath"
+                                "Error: File not found or cannot be read: $filePath"
                             }
                             
-                            NotificationGroupManager.getInstance()
-                                .getNotificationGroup("Magic Code Insert")
-                                .createNotification(
-                                    "Tool Response",
-                                    statusMsg,
-                                    if (fileContent != null) NotificationType.INFORMATION else NotificationType.WARNING
-                                )
-                                .notify(null)
+                            // Debug: log tool response
+                            if (settings.debugMode) {
+                                val toolResponseInfo = buildString {
+                                    appendLine("-".repeat(80))
+                                    appendLine("TOOL RESPONSE: read_file")
+                                    appendLine("-".repeat(80))
+                                    appendLine("File: $filePath")
+                                    appendLine("Status: ${if (fileContent != null) "SUCCESS" else "ERROR"}")
+                                    if (fileContent != null) {
+                                        appendLine("Size: ${fileContent.length} chars")
+                                        appendLine("-".repeat(80))
+                                        appendLine("Content Preview (first 500 chars):")
+                                        appendLine(fileContent.take(500))
+                                        if (fileContent.length > 500) {
+                                            appendLine("... (${fileContent.length - 500} more chars)")
+                                        }
+                                    }
+                                    appendLine("-".repeat(80))
+                                }
+                                LOG.info(toolResponseInfo)
+                                
+                                val statusMsg = if (fileContent != null) {
+                                    "✓ Sent $filePath (${fileContent.length} chars)"
+                                } else {
+                                    "✗ File not found: $filePath"
+                                }
+                                
+                                NotificationGroupManager.getInstance()
+                                    .getNotificationGroup("Magic Code Insert")
+                                    .createNotification(
+                                        "Tool Response",
+                                        statusMsg,
+                                        if (fileContent != null) NotificationType.INFORMATION else NotificationType.WARNING
+                                    )
+                                    .notify(null)
+                            }
+                            
+                            // Add tool response
+                            messages.add(Message(
+                                role = "tool",
+                                content = result,
+                                toolCallId = toolCall.id
+                            ))
                         }
                         
-                        // Add tool response
-                        messages.add(Message(
-                            role = "tool",
-                            content = result,
-                            toolCallId = toolCall.id
-                        ))
+                        "apply_edits" -> {
+                            // This is the final answer - edits to apply
+                            // Parse edits and return them for processing
+                            val args = gson.fromJson(toolCall.function.arguments, Map::class.java)
+                            val editsData = args["edits"] as? List<*> ?: emptyList<Map<String, String>>()
+                            
+                            if (settings.debugMode) {
+                                LOG.info("LLM requested apply_edits with ${editsData.size} edits")
+                            }
+                            
+                            // Signal that we have edits to apply by storing them temporarily
+                            // We'll handle them after the loop
+                            val editsJson = gson.toJson(editsData)
+                            messages.add(Message(
+                                role = "tool",
+                                content = "Edits will be applied: $editsJson",
+                                toolCallId = toolCall.id
+                            ))
+                            
+                            // Return the edits as final result
+                            return@getCodeCompletion "APPLY_EDITS:$editsJson"
+                        }
                     }
                 }
                 
