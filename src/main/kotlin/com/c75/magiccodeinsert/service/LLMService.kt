@@ -10,7 +10,6 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.util.net.ssl.CertificateManager
-import com.intellij.util.proxy.CommonProxy
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -31,22 +30,6 @@ class LLMService {
             .connectTimeout(settings.connectTimeout.toLong(), TimeUnit.SECONDS)
             .readTimeout(settings.readTimeout.toLong(), TimeUnit.SECONDS)
             .writeTimeout(settings.writeTimeout.toLong(), TimeUnit.SECONDS)
-        
-        // Use IDE proxy settings via CommonProxy
-        try {
-            val uri = URI(settings.apiEndpoint)
-            val proxySelector = CommonProxy.getInstance()
-            val proxies = proxySelector.select(uri)
-            
-            if (proxies != null && proxies.isNotEmpty()) {
-                val proxy = proxies.first()
-                if (proxy.type() != java.net.Proxy.Type.DIRECT) {
-                    builder.proxy(proxy)
-                }
-            }
-        } catch (e: Exception) {
-            // If proxy configuration fails, continue without proxy
-        }
         
         // Add IDE SSL certificate trust
         try {

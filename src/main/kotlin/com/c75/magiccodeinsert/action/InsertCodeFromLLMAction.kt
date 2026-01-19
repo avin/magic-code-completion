@@ -123,6 +123,7 @@ class InsertCodeFromLLMAction : AnAction() {
         caretOffset: Int
     ) {
         try {
+            @Suppress("UNCHECKED_CAST")
             val editsData = gson.fromJson(editsJson, List::class.java) as List<Map<String, String>>
             
             ApplicationManager.getApplication().invokeLater {
