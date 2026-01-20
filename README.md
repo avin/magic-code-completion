@@ -1,6 +1,12 @@
-# Magic Code Completion
-
-JetBrains IDEs plugin for AI-assisted code completion using OpenAI-compatible APIs with agentic file reading and multi-edit capabilities.
+<div align="center">
+  <img src="src/main/resources/META-INF/pluginIcon.svg" alt="Magic Code Completion Icon" width="120" height="120">
+  
+  # Magic Code Completion
+  
+  JetBrains IDEs plugin for AI-assisted code completion using OpenAI-compatible APIs with agentic file reading and multi-edit capabilities.
+  
+  <img src=".github/demo.gif" alt="Demo" width="600">
+</div>
 
 ## Features
 
