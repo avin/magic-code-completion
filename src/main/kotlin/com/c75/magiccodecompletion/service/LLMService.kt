@@ -16,7 +16,11 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.awt.datatransfer.StringSelection
 import java.io.IOException
 import java.net.URI
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 @Service(Service.Level.APP)
 class LLMService {
@@ -107,6 +111,7 @@ class LLMService {
      * @param project Current project (for file tree and reading files)
      * @param currentFilePath Current file path relative to project root
      * @param settingsState Optional settings state (for testing)
+     * @param progressIndicator Optional progress indicator for cancellation support
      * @return Generated code to insert at cursor position
      * @throws IOException if network request fails
      * @throws LLMException if API returns an error
@@ -115,7 +120,8 @@ class LLMService {
         codeWithCursor: String, 
         project: com.intellij.openapi.project.Project? = null,
         currentFilePath: String? = null,
-        settingsState: MagicCodeCompletionSettings.State? = null
+        settingsState: MagicCodeCompletionSettings.State? = null,
+        progressIndicator: com.intellij.openapi.progress.ProgressIndicator? = null
     ): String {
         val settings = settingsState ?: MagicCodeCompletionSettings.getInstance().state
         
@@ -209,34 +215,74 @@ class LLMService {
         // Tool call loop - max 10 iterations to prevent infinite loops
         var iteration = 0
         val maxIterations = 10
+        val currentCall = AtomicReference<Call?>(null)
         
-        while (iteration < maxIterations) {
-            iteration++
-            
-            val chatRequest = ChatRequest(
-                model = settings.model,
-                messages = messages,
-                temperature = settings.temperature,
-                maxTokens = settings.maxTokens,
-                tools = tools
-            )
-            
-            val requestBody = gson.toJson(chatRequest).toRequestBody(JSON_MEDIA_TYPE)
-            
-            // Debug logging if enabled
-            if (settings.debugMode && iteration == 1) {
-                logDebugRequest(settings, userMessage)
+        // Start cancellation monitor thread if progressIndicator is provided
+        val cancellationExecutor: ScheduledExecutorService? = if (progressIndicator != null) {
+            Executors.newSingleThreadScheduledExecutor { runnable ->
+                Thread(runnable, "MagicCodeCompletion-cancel").apply { isDaemon = true }
             }
-            
-            val request = Request.Builder()
-                .url(settings.apiEndpoint)
-                .addHeader("Authorization", "Bearer ${settings.apiKey}")
-                .addHeader("Content-Type", "application/json")
-                .post(requestBody)
-                .build()
-            
-            val client = createClient(settings)
-            val response = client.newCall(request).execute()
+        } else {
+            null
+        }
+        val cancellationMonitor: ScheduledFuture<*>? = cancellationExecutor?.scheduleAtFixedRate({
+            if (progressIndicator?.isCanceled == true) {
+                currentCall.get()?.cancel()
+            }
+        }, 0, 50, TimeUnit.MILLISECONDS) // Check every 50ms
+        
+        try {
+            while (iteration < maxIterations) {
+                iteration++
+                
+                // Check for cancellation before each iteration
+                if (progressIndicator?.isCanceled == true) {
+                    currentCall.get()?.cancel()
+                    throw LLMException("Operation cancelled by user")
+                }
+                
+                val chatRequest = ChatRequest(
+                    model = settings.model,
+                    messages = messages,
+                    temperature = settings.temperature,
+                    maxTokens = settings.maxTokens,
+                    tools = tools
+                )
+                
+                val requestBody = gson.toJson(chatRequest).toRequestBody(JSON_MEDIA_TYPE)
+                
+                // Debug logging if enabled
+                if (settings.debugMode && iteration == 1) {
+                    logDebugRequest(settings, userMessage)
+                }
+                
+                val request = Request.Builder()
+                    .url(settings.apiEndpoint)
+                    .addHeader("Authorization", "Bearer ${settings.apiKey}")
+                    .addHeader("Content-Type", "application/json")
+                    .post(requestBody)
+                    .build()
+                
+                val client = createClient(settings)
+                val call = client.newCall(request)
+                currentCall.set(call)
+                
+                // Check for cancellation before executing the request
+                if (progressIndicator?.isCanceled == true) {
+                    call.cancel()
+                    throw LLMException("Operation cancelled by user")
+                }
+                
+                val response = try {
+                    call.execute()
+                } catch (e: IOException) {
+                    if (progressIndicator?.isCanceled == true) {
+                        throw LLMException("Operation cancelled by user")
+                    }
+                    throw e
+                } finally {
+                    currentCall.set(null)
+                }
             
             val responseBody = response.body?.string()
                 ?: throw LLMException("Empty response from API")
@@ -377,7 +423,8 @@ class LLMService {
                             ))
                             
                             // Return the edits as final result
-                            return@getCodeCompletion "APPLY_EDITS:$editsJson"
+                            cancellationMonitor?.cancel(true)
+                            return "APPLY_EDITS:$editsJson"
                         }
                     }
                 }
@@ -408,11 +455,18 @@ class LLMService {
                 val completion = assistantMessage.content
                     ?: throw LLMException("No completion in response")
                 
+                cancellationMonitor?.cancel(true)
                 return completion.trim()
             }
+            }
+            
+            throw LLMException("Maximum tool call iterations exceeded ($maxIterations)")
+        } finally {
+            // Always stop the cancellation monitor
+            cancellationMonitor?.cancel(true)
+            cancellationExecutor?.shutdownNow()
+            currentCall.get()?.cancel()
         }
-        
-        throw LLMException("Maximum tool call iterations exceeded ($maxIterations)")
     }
     
     private fun logDebugRequest(settings: MagicCodeCompletionSettings.State, userMessage: String) {

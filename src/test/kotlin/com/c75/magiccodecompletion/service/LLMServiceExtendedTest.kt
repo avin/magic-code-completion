@@ -1,6 +1,7 @@
 package com.c75.magiccodecompletion.service
 
 import com.c75.magiccodecompletion.settings.MagicCodeCompletionSettings
+import com.intellij.openapi.progress.ProgressIndicator
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.SocketPolicy
@@ -376,5 +377,44 @@ class LLMServiceExtendedTest {
             val result = llmService.getCodeCompletion("test", null, null, settings)
             assertEquals("test response", result)
         }
+    }
+    
+    @Test
+    fun `test cancellation via ProgressIndicator stops request`() {
+        // Create a mock ProgressIndicator that is already cancelled
+        val indicator = object : ProgressIndicator {
+            override fun isCanceled(): Boolean = true
+            override fun cancel() {}
+            override fun start() {}
+            override fun stop() {}
+            override fun isRunning(): Boolean = true
+            override fun setText(text: String?) {}
+            override fun getText(): String? = null
+            override fun setText2(text: String?) {}
+            override fun getText2(): String? = null
+            override fun getFraction(): Double = 0.0
+            override fun setFraction(fraction: Double) {}
+            override fun pushState() {}
+            override fun popState() {}
+            override fun isModal(): Boolean = false
+            override fun checkCanceled() {
+                if (isCanceled) throw com.intellij.openapi.progress.ProcessCanceledException()
+            }
+            override fun setIndeterminate(indeterminate: Boolean) {}
+            override fun isIndeterminate(): Boolean = true
+            override fun getModalityState(): com.intellij.openapi.application.ModalityState = 
+                com.intellij.openapi.application.ModalityState.defaultModalityState()
+            override fun setModalityProgress(p0: ProgressIndicator?) {}
+            override fun isPopupWasShown(): Boolean = false
+            override fun isShowing(): Boolean = false
+        }
+        
+        // Should throw LLMException with cancellation message immediately
+        val exception = assertThrows(LLMService.LLMException::class.java) {
+            llmService.getCodeCompletion("test", null, null, settings, indicator)
+        }
+        
+        assertTrue(exception.message?.contains("cancelled", ignoreCase = true) == true,
+            "Expected cancellation message, got: ${exception.message}")
     }
 }

@@ -19,13 +19,15 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.codeStyle.CodeStyleManager
-import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
+import java.awt.KeyEventDispatcher
+import java.awt.KeyboardFocusManager
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 class InsertCodeFromLLMAction : AnAction() {
     
@@ -33,7 +35,6 @@ class InsertCodeFromLLMAction : AnAction() {
         const val CURSOR_MARKER = "<<<CURSOR>>>"
         const val APPLY_EDITS_PREFIX = "APPLY_EDITS:"
         
-        // ASCII spinner frames (brackets progress bar)
         private val SPINNER_FRAMES = arrayOf(
             "[    ]",
             "[=   ]",
@@ -45,6 +46,7 @@ class InsertCodeFromLLMAction : AnAction() {
             "[   =]"
         )
         private val scheduler = Executors.newScheduledThreadPool(1)
+        private val isGenerating = AtomicBoolean(false)
     }
     
     private val gson = Gson()
@@ -54,14 +56,16 @@ class InsertCodeFromLLMAction : AnAction() {
     }
     
     override fun update(e: AnActionEvent) {
-        // Enable action only when editor is available
         val editor = e.getData(CommonDataKeys.EDITOR)
-        e.presentation.isEnabled = editor != null
+        e.presentation.isEnabled = editor != null && !isGenerating.get()
     }
     
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val editor = e.getData(CommonDataKeys.EDITOR) ?: return
+        if (!isGenerating.compareAndSet(false, true)) {
+            return
+        }
         val virtualFile = e.getData(CommonDataKeys.VIRTUAL_FILE)
         
         val document = editor.document
@@ -85,20 +89,22 @@ class InsertCodeFromLLMAction : AnAction() {
         val frameIndex = AtomicInteger(0)
         var animationTask: ScheduledFuture<*>? = null
         val cancelled = AtomicBoolean(false)
+        val indicatorRef = AtomicReference<ProgressIndicator?>(null)
+        val focusManager = KeyboardFocusManager.getCurrentKeyboardFocusManager()
         
-        // ESC key listener to cancel generation
-        val escKeyListener = object : KeyAdapter() {
-            override fun keyPressed(e: KeyEvent) {
-                if (e.keyCode == KeyEvent.VK_ESCAPE && !cancelled.get()) {
-                    cancelled.set(true)
-                    e.consume()
-                }
+        val escDispatcher = KeyEventDispatcher { event ->
+            if (event.id == KeyEvent.KEY_PRESSED && event.keyCode == KeyEvent.VK_ESCAPE) {
+                cancelled.set(true)
+                indicatorRef.get()?.cancel()
+                false
+            } else {
+                false
             }
         }
-        
+
+        focusManager.addKeyEventDispatcher(escDispatcher)
+
         ApplicationManager.getApplication().invokeLater {
-            editor.contentComponent.addKeyListener(escKeyListener)
-            
             inlayHint = editor.inlayModel.addInlineElement(
                 caretOffset,
                 true,
@@ -147,35 +153,60 @@ class InsertCodeFromLLMAction : AnAction() {
             override fun run(indicator: ProgressIndicator) {
                 indicator.isIndeterminate = true
                 indicator.text = "Sending request to LLM..."
+                indicatorRef.set(indicator)
                 
                 try {
                     val llmService = LLMService.getInstance()
                     
-                    // Check for cancellation during execution
-                    while (!indicator.isCanceled && !cancelled.get()) {
-                        // Start request in chunks to allow cancellation checks
-                        // For now, we'll just do the request and check after
-                        generatedCode = llmService.getCodeCompletion(codeWithCursor, project, currentFilePath)
-                        break
+                    // Check for cancellation from ESC key
+                    if (cancelled.get()) {
+                        indicator.cancel()
+                        return
                     }
                     
+                    // Pass progress indicator to enable HTTP request cancellation
+                    // Create a custom indicator that checks our cancelled flag
+                    val wrappedIndicator = object : ProgressIndicator by indicator {
+                        override fun isCanceled(): Boolean {
+                            return cancelled.get() || indicator.isCanceled
+                        }
+                    }
+                    
+                    generatedCode = llmService.getCodeCompletion(
+                        codeWithCursor, 
+                        project, 
+                        currentFilePath,
+                        null, // settingsState
+                        wrappedIndicator // Wrapped indicator that checks our cancelled flag
+                    )
+                    
+                    // Check again after completion
                     if (cancelled.get()) {
                         indicator.cancel()
                     }
                 } catch (e: LLMService.LLMException) {
+                    if (cancelled.get() || indicator.isCanceled) {
+                        // Silently ignore cancellation errors
+                        return
+                    }
                     error = e.message
                 } catch (e: Exception) {
+                    if (cancelled.get() || indicator.isCanceled) {
+                        // Silently ignore cancellation errors
+                        return
+                    }
                     error = "Unexpected error: ${e.message}"
                 }
             }
             
             override fun onSuccess() {
-                // Stop animation and remove hint
                 animationTask?.cancel(false)
                 ApplicationManager.getApplication().invokeLater {
-                    editor.contentComponent.removeKeyListener(escKeyListener)
+                    focusManager.removeKeyEventDispatcher(escDispatcher)
                     inlayHint?.let { Disposer.dispose(it) }
                 }
+                
+                isGenerating.set(false)
                 
                 // Check if cancelled
                 if (cancelled.get()) {
@@ -190,28 +221,38 @@ class InsertCodeFromLLMAction : AnAction() {
                 val code = generatedCode ?: return
                 
                 // Check if this is apply_edits response
-                if (code.startsWith(APPLY_EDITS_PREFIX)) {
-                    val editsJson = code.removePrefix(APPLY_EDITS_PREFIX)
-                    applyEdits(project, editor, document, editsJson, caretOffset)
-                } else {
-                    // Simple insertion at cursor (legacy behavior)
-                    ApplicationManager.getApplication().invokeLater {
-                        WriteCommandAction.runWriteCommandAction(project) {
-                            document.insertString(caretOffset, code)
-                            // Move cursor to end of inserted text
-                            caretModel.moveToOffset(caretOffset + code.length)
+                try {
+                    if (code.startsWith(APPLY_EDITS_PREFIX)) {
+                        val editsJson = code.removePrefix(APPLY_EDITS_PREFIX)
+                        applyEdits(project, editor, document, editsJson, caretOffset)
+                    } else {
+                        // Simple insertion at cursor (legacy behavior)
+                        ApplicationManager.getApplication().invokeLater {
+                            WriteCommandAction.runWriteCommandAction(project) {
+                                document.insertString(caretOffset, code)
+                                // Move cursor to end of inserted text
+                                caretModel.moveToOffset(caretOffset + code.length)
+                            }
                         }
                     }
+                } catch (e: Exception) {
+                    // Handle any errors during code application
+                    Messages.showErrorDialog(
+                        project,
+                        "Failed to apply code changes: ${e.message}",
+                        "Code Application Error"
+                    )
                 }
             }
             
             override fun onThrowable(throwable: Throwable) {
-                // Stop animation and remove hint
                 animationTask?.cancel(false)
                 ApplicationManager.getApplication().invokeLater {
-                    editor.contentComponent.removeKeyListener(escKeyListener)
+                    focusManager.removeKeyEventDispatcher(escDispatcher)
                     inlayHint?.let { Disposer.dispose(it) }
                 }
+                
+                isGenerating.set(false)
                 
                 Messages.showErrorDialog(
                     project,
@@ -221,12 +262,13 @@ class InsertCodeFromLLMAction : AnAction() {
             }
             
             override fun onCancel() {
-                // Stop animation and remove hint
                 animationTask?.cancel(false)
                 ApplicationManager.getApplication().invokeLater {
-                    editor.contentComponent.removeKeyListener(escKeyListener)
+                    focusManager.removeKeyEventDispatcher(escDispatcher)
                     inlayHint?.let { Disposer.dispose(it) }
                 }
+                
+                isGenerating.set(false)
             }
         })
     }
