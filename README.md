@@ -27,13 +27,13 @@
 ## Why this plugin?
 
 ### Better than standard autocomplete
-- Sees entire project structure, not just nearby lines
-- Reads relevant files on demand for context-aware completions
-- Uses advanced reasoning models instead of basic pattern matching
-- Generates complete implementations, not just snippets
+- 🌳 Sees entire project structure, not just nearby lines
+- 📖 Reads relevant files on demand for context-aware completions
+- 🧠 Uses advanced reasoning models instead of basic pattern matching
+- ✨ Generates complete implementations, not just snippets
 
 ### More convenient than chat agents
-- Single hotkey (Alt+I) at cursor position - no switching windows
-- No manual copy-paste or context explanation needed
-- Focused action: "complete here" vs. vague multi-file chat requests
-- Controlled file access via include/exclude patterns
+- ⌨️ Single hotkey (Alt+I) at cursor position - no switching windows
+- 🚫 No manual copy-paste or context explanation needed
+- 🎯 Focused action: "complete here" vs. vague multi-file chat requests
+- ⚙️ Controlled file access via include/exclude patterns
