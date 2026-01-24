@@ -16,8 +16,8 @@ class CodeChangeGutterRenderer(
 ) : GutterIconRenderer() {
     
     override fun getIcon(): Icon {
-        // Show a lightning bolt icon to indicate AI-generated change
-        return AllIcons.Actions.Lightning
+        // Show a green checkmark icon to indicate successful AI-generated change
+        return AllIcons.General.InspectionsOKEmpty
     }
     
     override fun getTooltipText(): String {
