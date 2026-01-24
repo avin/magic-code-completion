@@ -13,19 +13,30 @@
     <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-description -->
     <description><![CDATA[
-        AI-assisted code completion plugin using OpenAI-compatible APIs with agentic file reading and multi-edit capabilities.<br>
+        JetBrains IDEs plugin for AI-assisted code completion using OpenAI-compatible APIs with agentic file reading and multi-edit capabilities.<br>
         <br>
-        <em>Key Features:</em>
+        <strong>How to Use:</strong><br>
+        1. Open <strong>Tools → Magic Code Completion</strong> in your IDE<br>
+        2. Configure API access to your LLM (we recommend using advanced reasoning models for better code quality)<br>
+        3. Specify glob patterns for files you want the LLM to see - during completion generation, the LLM will see the list of these files and can read them if needed to expand context<br>
+        4. Place your cursor at the location where you want code completion<br>
+        5. Press <strong>Alt+I</strong><br>
+        <br>
+        <strong>Why this plugin?</strong><br>
+        <br>
+        <em>Better than standard autocomplete:</em>
         <ul>
-            <li><strong>Alt+I hotkey</strong> - Quick code completion at cursor position</li>
-            <li><strong>Agentic file access</strong> - LLM can dynamically request and read project files via function calling</li>
-            <li><strong>Multi-edit support</strong> - Apply multiple code changes (imports, refactoring, insertion) in a single request</li>
-            <li><strong>Visual change tracking</strong> - Highlighted changes with accept/reject actions via gutter icons</li>
-            <li><strong>Auto-formatting</strong> - Automatically formats inserted/modified code</li>
-            <li><strong>Project-aware context</strong> - File tree with current file marker</li>
-            <li><strong>Flexible configuration</strong> - Works with any OpenAI-compatible API (OpenAI, local LLMs, etc.)</li>
-            <li><strong>Per-project file patterns</strong> - Customizable include/exclude patterns for context</li>
-            <li><strong>Debug mode</strong> - Optional request/response logging</li>
+            <li>🌳 Sees entire project structure, not just nearby lines</li>
+            <li>📖 Reads relevant files on demand for context-aware completions</li>
+            <li>🧠 Uses advanced reasoning models instead of basic pattern matching</li>
+            <li>✨ Generates complete implementations, not just snippets</li>
+        </ul>
+        <em>More convenient than chat agents:</em>
+        <ul>
+            <li>⌨️ Single hotkey (Alt+I) at cursor position - no switching windows</li>
+            <li>🚫 No manual copy-paste or context explanation needed</li>
+            <li>🎯 Focused action: "complete here" vs. vague multi-file chat requests</li>
+            <li>⚙️ Controlled file access via include/exclude patterns</li>
         </ul>
     ]]></description>
 
