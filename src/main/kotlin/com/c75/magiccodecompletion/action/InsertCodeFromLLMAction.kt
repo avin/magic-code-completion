@@ -1,6 +1,9 @@
 package com.c75.magiccodecompletion.action
 
 import com.c75.magiccodecompletion.service.LLMService
+import com.c75.magiccodecompletion.settings.MagicCodeCompletionSettings
+import com.c75.magiccodecompletion.ui.CodeChangeHighlighter
+import com.c75.magiccodecompletion.ui.CodeChangeNotification
 import com.google.gson.Gson
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
@@ -281,14 +284,28 @@ class InsertCodeFromLLMAction : AnAction() {
         caretOffset: Int
     ) {
         try {
+            val settings = MagicCodeCompletionSettings.getInstance().state
             @Suppress("UNCHECKED_CAST")
             val editsData = gson.fromJson(editsJson, List::class.java) as List<Map<String, String>>
+            
+            // Save original document state before changes
+            val originalDocumentText = document.text
+            
+            // Create highlighter if visualization is enabled
+            val highlighter = if (settings.showChangeHighlighting) {
+                CodeChangeHighlighter(project, editor).apply {
+                    saveOriginalState(originalDocumentText)
+                }
+            } else {
+                null
+            }
             
             ApplicationManager.getApplication().invokeLater {
                 WriteCommandAction.runWriteCommandAction(project) {
                     var currentText = document.text
                     var cursorPosition = caretOffset
-                    val editedRanges = mutableListOf<TextRange>()
+                    data class EditInfo(val range: TextRange, val originalText: String, val newText: String)
+                    val editedRanges = mutableListOf<EditInfo>()
                     
                     // Apply edits sequentially
                     for (edit in editsData) {
@@ -302,7 +319,11 @@ class InsertCodeFromLLMAction : AnAction() {
                         if (search == CURSOR_MARKER) {
                             // Insert at cursor position
                             document.insertString(cursorPosition, replace)
-                            editedRanges.add(TextRange(cursorPosition, cursorPosition + replace.length))
+                            editedRanges.add(EditInfo(
+                                TextRange(cursorPosition, cursorPosition + replace.length),
+                                "",
+                                replace
+                            ))
                             
                             // If replace had cursor marker, position cursor there, otherwise at end of insert
                             cursorPosition = if (cursorInReplace != -1) {
@@ -317,8 +338,14 @@ class InsertCodeFromLLMAction : AnAction() {
                             // Find and replace in current text
                             val searchIndex = currentText.indexOf(searchWithoutMarker)
                             if (searchIndex != -1) {
+                                // Save original text before replacing
+                                val originalText = searchWithoutMarker
                                 document.replaceString(searchIndex, searchIndex + searchWithoutMarker.length, replace)
-                                editedRanges.add(TextRange(searchIndex, searchIndex + replace.length))
+                                editedRanges.add(EditInfo(
+                                    TextRange(searchIndex, searchIndex + replace.length),
+                                    originalText,
+                                    replace
+                                ))
                                 
                                 // Update cursor position
                                 if (searchIndex < cursorPosition) {
@@ -341,9 +368,9 @@ class InsertCodeFromLLMAction : AnAction() {
                     val psiFile = PsiDocumentManager.getInstance(project).getPsiFile(document)
                     if (psiFile != null) {
                         val codeStyleManager = CodeStyleManager.getInstance(project)
-                        for (range in editedRanges) {
+                        for (editInfo in editedRanges) {
                             try {
-                                codeStyleManager.reformatText(psiFile, range.startOffset, range.endOffset)
+                                codeStyleManager.reformatText(psiFile, editInfo.range.startOffset, editInfo.range.endOffset)
                             } catch (e: Exception) {
                                 // Ignore formatting errors
                             }
@@ -353,8 +380,36 @@ class InsertCodeFromLLMAction : AnAction() {
                         cursorPosition = editor.caretModel.offset
                     }
                     
+                    // Add changes to highlighter for visualization
+                    highlighter?.let { h ->
+                        for (editInfo in editedRanges) {
+                            h.addEdit(editInfo.range, editInfo.originalText, editInfo.newText)
+                        }
+                    }
+                    
                     // Move cursor to final position
                     editor.caretModel.moveToOffset(cursorPosition)
+                }
+                
+                // Show notification if enabled and there were changes
+                if (editsData.isNotEmpty() && settings.showChangeNotification) {
+                    CodeChangeNotification.showChangeNotification(
+                        project = project,
+                        changeCount = editsData.size,
+                        onAcceptAll = { 
+                            highlighter?.acceptAll()
+                        },
+                        onUndo = {
+                            // If highlighter exists, use it; otherwise restore original text directly
+                            if (highlighter != null) {
+                                highlighter.rejectAll()
+                            } else {
+                                WriteCommandAction.runWriteCommandAction(project) {
+                                    document.setText(originalDocumentText)
+                                }
+                            }
+                        }
+                    )
                 }
             }
         } catch (e: Exception) {

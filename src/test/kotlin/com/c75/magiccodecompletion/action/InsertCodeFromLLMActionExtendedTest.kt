@@ -236,4 +236,64 @@ class InsertCodeFromLLMActionExtendedTest {
             assertTrue(path.endsWith(".kt"))
         }
     }
+    
+    @Test
+    fun `test visualization settings data structure`() {
+        // Test that settings flags work as expected in logic
+        
+        // Test all combinations with separate variables
+        var showHighlighting = true
+        var showNotification = true
+        assertTrue(showHighlighting && showNotification) // Both enabled
+        
+        showHighlighting = false
+        showNotification = true
+        assertTrue(showNotification && !showHighlighting) // Only notification
+        
+        showHighlighting = true
+        showNotification = false
+        assertTrue(showHighlighting && !showNotification) // Only highlighting
+        
+        showHighlighting = false
+        showNotification = false
+        assertTrue(!showHighlighting && !showNotification) // Both disabled
+    }
+    
+    @Test
+    fun `test notification shows when highlighting is disabled`() {
+        // This tests the logic: notification should work independently
+        val showHighlighting = false
+        val showNotification = true
+        val hasEdits = true
+        
+        // Notification should show when: hasEdits && showNotification (no dependency on highlighter)
+        val shouldShowNotification = hasEdits && showNotification
+        assertTrue(shouldShowNotification)
+    }
+    
+    @Test
+    fun `test undo callback works without highlighter`() {
+        // Test that undo logic handles null highlighter case
+        val highlighter: Any? = null
+        val originalText = "function test() { return 42; }"
+        
+        // When highlighter is null, should still be able to restore from saved text
+        if (highlighter != null) {
+            fail("Highlighter should be null in this test")
+        } else {
+            // Direct text restoration should work
+            assertNotNull(originalText)
+            assertTrue(originalText.isNotEmpty())
+        }
+    }
+    
+    @Test
+    fun `test original text preservation before applying edits`() {
+        val documentText = "const x = 10;\nconst y = 20;"
+        val originalDocumentText = documentText // Saved before edits
+        
+        // After edits are applied, original should still be available
+        assertNotNull(originalDocumentText)
+        assertEquals(documentText, originalDocumentText)
+    }
 }

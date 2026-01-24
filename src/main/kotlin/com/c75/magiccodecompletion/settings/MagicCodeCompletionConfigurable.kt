@@ -28,6 +28,8 @@ class MagicCodeCompletionConfigurable(private val project: Project) : Configurab
     private var excludeFilesEnabled = true
     private var excludePatternsText = ""
     private var debugModeEnabled = false
+    private var showChangeHighlightingEnabled = true
+    private var showChangeNotificationEnabled = false
     
     override fun getDisplayName(): String = "Magic Code Completion"
     
@@ -49,6 +51,8 @@ class MagicCodeCompletionConfigurable(private val project: Project) : Configurab
         excludePatternsText = projectSettings.excludePatterns.joinToString("\n")
         systemPromptContent = settings.systemPrompt
         debugModeEnabled = settings.debugMode
+        showChangeHighlightingEnabled = settings.showChangeHighlighting
+        showChangeNotificationEnabled = settings.showChangeNotification
         
         settingsPanel = panel {
             group("OpenAI API Configuration") {
@@ -126,6 +130,19 @@ class MagicCodeCompletionConfigurable(private val project: Project) : Configurab
                 }
             }
             
+            group("Code Change Visualization") {
+                row {
+                    checkBox("Show change highlighting with gutter icons")
+                        .bindSelected({ showChangeHighlightingEnabled }, { showChangeHighlightingEnabled = it })
+                        .comment("Highlight LLM-generated changes with green background and ⚡ icons in gutter")
+                }
+                row {
+                    checkBox("Show notification with Accept/Undo buttons")
+                        .bindSelected({ showChangeNotificationEnabled }, { showChangeNotificationEnabled = it })
+                        .comment("Display notification balloon with 'Accept All Changes' and 'Undo All Changes' buttons")
+                }
+            }
+            
             group("Debug") {
                 row {
                     checkBox("Enable debug mode")
@@ -181,6 +198,8 @@ class MagicCodeCompletionConfigurable(private val project: Project) : Configurab
         settings.writeTimeout = writeTimeoutValue
         settings.systemPrompt = systemPromptContent
         settings.debugMode = debugModeEnabled
+        settings.showChangeHighlighting = showChangeHighlightingEnabled
+        settings.showChangeNotification = showChangeNotificationEnabled
         
         projectSettings.excludeFiles = excludeFilesEnabled
         projectSettings.codeMapIncludePatterns = codeMapPatternsText

@@ -13,6 +13,7 @@
 - **Alt+I hotkey** - Quick code completion at cursor position
 - **Agentic file access** - LLM can dynamically request and read project files
 - **Multi-edit support** - Apply multiple code changes in a single request
+- **Visual change tracking** - See highlighted changes with accept/reject actions
 - **Project-aware** - File tree context
 
 ## Settings

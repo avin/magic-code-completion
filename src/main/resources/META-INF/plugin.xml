@@ -20,6 +20,7 @@
             <li><strong>Alt+I hotkey</strong> - Quick code completion at cursor position</li>
             <li><strong>Agentic file access</strong> - LLM can dynamically request and read project files via function calling</li>
             <li><strong>Multi-edit support</strong> - Apply multiple code changes (imports, refactoring, insertion) in a single request</li>
+            <li><strong>Visual change tracking</strong> - Highlighted changes with accept/reject actions via gutter icons</li>
             <li><strong>Auto-formatting</strong> - Automatically formats inserted/modified code</li>
             <li><strong>Project-aware context</strong> - File tree with current file marker</li>
             <li><strong>Flexible configuration</strong> - Works with any OpenAI-compatible API (OpenAI, local LLMs, etc.)</li>
@@ -38,6 +39,9 @@
         
         <!-- Notification group for debug messages -->
         <notificationGroup id="Magic Code Completion" displayType="BALLOON"/>
+        
+        <!-- Notification group for code changes -->
+        <notificationGroup id="MagicCodeCompletion.Changes" displayType="BALLOON"/>
         
         <!-- Settings page -->
         <projectConfigurable 

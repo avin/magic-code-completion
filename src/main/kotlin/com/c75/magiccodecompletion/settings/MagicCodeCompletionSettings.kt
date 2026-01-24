@@ -19,7 +19,10 @@ class MagicCodeCompletionSettings : PersistentStateComponent<MagicCodeCompletion
         var connectTimeout: Int = 30,
         var readTimeout: Int = 120,
         var writeTimeout: Int = 30,
-        var debugMode: Boolean = false
+        var debugMode: Boolean = false,
+        // Change visualization settings
+        var showChangeHighlighting: Boolean = true,
+        var showChangeNotification: Boolean = false
     )
     
     private var myState = State()
