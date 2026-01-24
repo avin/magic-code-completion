@@ -1,5 +1,6 @@
 package com.c75.magiccodecompletion.ui
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.event.DocumentEvent
@@ -11,6 +12,8 @@ import com.intellij.openapi.editor.markup.TextAttributes
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.ui.JBColor
+import com.intellij.util.concurrency.AppExecutorUtil
+import java.util.concurrent.TimeUnit
 
 /**
  * Stores information about a code change for potential rollback
@@ -32,11 +35,15 @@ class CodeChangeHighlighter(
     private val edits = mutableListOf<CodeEdit>()
     private var originalDocumentText: String = ""
     private var isInternalEdit = false // Flag to prevent recursive listener calls
+    private var autoAcceptEnabled = false // Flag to control auto-accept behavior
     
     private val documentListener = object : DocumentListener {
         override fun documentChanged(event: DocumentEvent) {
             // Ignore changes made by our own reject/rejectAll operations
             if (isInternalEdit) return
+            
+            // Don't auto-accept if it's disabled (e.g., during initial formatting)
+            if (!autoAcceptEnabled) return
             
             // Check if the change overlaps with any highlighted range
             val changedRange = TextRange(event.offset, event.offset + event.newLength)
@@ -55,8 +62,25 @@ class CodeChangeHighlighter(
      */
     fun saveOriginalState(documentText: String) {
         originalDocumentText = documentText
+        autoAcceptEnabled = false // Start with auto-accept disabled
         // Register document listener when we start tracking changes
         editor.document.addDocumentListener(documentListener)
+    }
+    
+    /**
+     * Enable auto-accept after a delay to allow formatting to complete
+     * This gives external formatters (prettier, black, etc.) time to finish
+     */
+    fun enableAutoAcceptAfterDelay(delayMs: Long = 500) {
+        AppExecutorUtil.getAppScheduledExecutorService().schedule(
+            {
+                ApplicationManager.getApplication().invokeLater {
+                    autoAcceptEnabled = true
+                }
+            },
+            delayMs,
+            TimeUnit.MILLISECONDS
+        )
     }
     
     /**

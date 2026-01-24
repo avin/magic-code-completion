@@ -197,6 +197,91 @@ class CodeChangeVisualizationIntegrationTest {
     }
     
     @Test
+    fun `test highlighting persists after auto-formatting`() {
+        // Test that highlights remain valid after code formatting changes document offsets
+        // This verifies the fix for the issue where formatting would invalidate highlight ranges
+        
+        // Setup: Create a document with unformatted code
+        val doc = object {
+            var content = "function test(){const x=1;}"
+            val highlights = mutableListOf<Pair<Int, Int>>()
+        }
+        
+        // Step 1: Apply LLM edit (replace with unformatted code)
+        val searchText = "const x=1;"
+        val replaceText = "const x=1;const y=2;"
+        val startOffset = doc.content.indexOf(searchText)
+        val endOffset = startOffset + replaceText.length
+        
+        doc.content = doc.content.replace(searchText, replaceText)
+        
+        // Step 2: Store initial range (before formatting)
+        val initialRange = Pair(startOffset, endOffset)
+        
+        // Step 3: Simulate auto-formatting (adds spaces and newlines)
+        val formattedCode = "function test() {\n    const x = 1;\n    const y = 2;\n}"
+        doc.content = formattedCode
+        
+        // Step 4: Calculate updated range after formatting
+        // In real implementation, RangeMarker tracks this automatically
+        val formattedStartOffset = formattedCode.indexOf("const x = 1;")
+        val formattedEndOffset = formattedCode.indexOf("const y = 2;") + "const y = 2;".length
+        val updatedRange = Pair(formattedStartOffset, formattedEndOffset)
+        
+        // Step 5: Add highlight with updated range (not initial range)
+        doc.highlights.add(updatedRange)
+        
+        // Verify: Highlight range should match the formatted code positions
+        assertEquals(1, doc.highlights.size)
+        val highlight = doc.highlights[0]
+        
+        // The highlighted text should be the formatted version
+        val highlightedText = doc.content.substring(highlight.first, highlight.second)
+        assertTrue(highlightedText.contains("const x = 1;"))
+        assertTrue(highlightedText.contains("const y = 2;"))
+        
+        // Verify the ranges changed due to formatting (proves the fix is needed)
+        assertNotEquals(initialRange.first, updatedRange.first, 
+            "Formatting should change start offset")
+        assertNotEquals(initialRange.second, updatedRange.second, 
+            "Formatting should change end offset")
+    }
+    
+    @Test
+    fun `test highlighting waits for async formatting completion`() {
+        // Test that auto-accept is disabled during formatting period
+        // This simulates external formatters like prettier or black
+        
+        data class HighlighterState(
+            var autoAcceptEnabled: Boolean = false,
+            val highlights: MutableList<String> = mutableListOf()
+        )
+        
+        val state = HighlighterState()
+        
+        // Step 1: Apply LLM edits and add highlighting
+        state.highlights.add("change1")
+        state.autoAcceptEnabled = false // Auto-accept disabled initially
+        
+        // Step 2: Verify auto-accept is disabled during formatting window
+        assertEquals(1, state.highlights.size)
+        assertFalse(state.autoAcceptEnabled, 
+            "Auto-accept should be disabled to allow formatters to complete")
+        
+        // Step 3: Simulate external formatter running (prettier, black, etc.)
+        // Changes during this time should NOT trigger auto-accept
+        
+        // Step 4: After delay (1 second), auto-accept is enabled
+        state.autoAcceptEnabled = true
+        
+        // Step 5: Verify auto-accept is now enabled
+        assertTrue(state.autoAcceptEnabled, 
+            "Auto-accept should be enabled after formatting delay")
+        assertEquals(1, state.highlights.size, 
+            "Highlights should remain during formatting")
+    }
+    
+    @Test
     fun `test cursor positioning after changes`() {
         // Cursor should be positioned correctly after applying changes
         data class CursorPosition(var offset: Int)

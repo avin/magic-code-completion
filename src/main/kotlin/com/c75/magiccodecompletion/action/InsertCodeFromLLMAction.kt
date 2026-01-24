@@ -293,11 +293,13 @@ class InsertCodeFromLLMAction : AnAction() {
             }
             
             ApplicationManager.getApplication().invokeLater {
+                data class EditInfo(val range: TextRange, val originalText: String, val newText: String)
+                val editedRanges = mutableListOf<EditInfo>()
+                var finalCursorPosition = caretOffset
+                
                 WriteCommandAction.runWriteCommandAction(project) {
                     var currentText = document.text
                     var cursorPosition = caretOffset
-                    data class EditInfo(val range: TextRange, val originalText: String, val newText: String)
-                    val editedRanges = mutableListOf<EditInfo>()
                     
                     // Apply edits sequentially
                     for (edit in editsData) {
@@ -356,52 +358,77 @@ class InsertCodeFromLLMAction : AnAction() {
                         }
                     }
                     
-                    // Auto-format edited ranges
-                    val psiFile = PsiDocumentManager.getInstance(project).getPsiFile(document)
-                    if (psiFile != null) {
+                    // Move cursor to final position
+                    finalCursorPosition = cursorPosition
+                    editor.caretModel.moveToOffset(cursorPosition)
+                }
+                
+                // Create range markers OUTSIDE WriteCommandAction to survive async formatting
+                val rangeMarkers = editedRanges.map { editInfo ->
+                    document.createRangeMarker(editInfo.range.startOffset, editInfo.range.endOffset).apply {
+                        isGreedyToLeft = true
+                        isGreedyToRight = true
+                    } to editInfo
+                }
+                
+                // Trigger formatting (may be async for external formatters)
+                val psiFile = PsiDocumentManager.getInstance(project).getPsiFile(document)
+                if (psiFile != null) {
+                    WriteCommandAction.runWriteCommandAction(project) {
                         val codeStyleManager = CodeStyleManager.getInstance(project)
-                        for (editInfo in editedRanges) {
+                        for ((marker, _) in rangeMarkers) {
                             try {
-                                codeStyleManager.reformatText(psiFile, editInfo.range.startOffset, editInfo.range.endOffset)
+                                if (marker.isValid) {
+                                    codeStyleManager.reformatText(psiFile, marker.startOffset, marker.endOffset)
+                                }
                             } catch (e: Exception) {
                                 // Ignore formatting errors
                             }
                         }
-                        
-                        // Update cursor position after formatting (it might have shifted)
-                        cursorPosition = editor.caretModel.offset
                     }
-                    
-                    // Add changes to highlighter for visualization
-                    highlighter?.let { h ->
-                        for (editInfo in editedRanges) {
-                            h.addEdit(editInfo.range, editInfo.originalText, editInfo.newText)
-                        }
-                    }
-                    
-                    // Move cursor to final position
-                    editor.caretModel.moveToOffset(cursorPosition)
                 }
                 
-                // Show notification if enabled and there were changes
-                if (editsData.isNotEmpty() && settings.showChangeNotification) {
-                    CodeChangeNotification.showChangeNotification(
-                        project = project,
-                        changeCount = editsData.size,
-                        onAcceptAll = { 
-                            highlighter?.acceptAll()
-                        },
-                        onUndo = {
-                            // If highlighter exists, use it; otherwise restore original text directly
-                            if (highlighter != null) {
-                                highlighter.rejectAll()
-                            } else {
-                                WriteCommandAction.runWriteCommandAction(project) {
-                                    document.setText(originalDocumentText)
+                // Wait for all PSI/document commits to finish (including async formatters)
+                // then add highlighting with final ranges
+                val psiDocumentManager = PsiDocumentManager.getInstance(project)
+                psiDocumentManager.performWhenAllCommitted {
+                    ApplicationManager.getApplication().invokeLater {
+                        highlighter?.let { h ->
+                            for ((marker, editInfo) in rangeMarkers) {
+                                if (marker.isValid) {
+                                    // Use final range from marker after all formatting completed
+                                    val updatedRange = TextRange(marker.startOffset, marker.endOffset)
+                                    h.addEdit(updatedRange, editInfo.originalText, editInfo.newText)
                                 }
+                                // Dispose marker after use
+                                marker.dispose()
                             }
+                            
+                            // Enable auto-accept after 500ms delay to allow external formatters (prettier, etc.) to finish
+                            h.enableAutoAcceptAfterDelay(500)
                         }
-                    )
+                        
+                        // Show notification AFTER highlighting is added
+                        if (editsData.isNotEmpty() && settings.showChangeNotification) {
+                            CodeChangeNotification.showChangeNotification(
+                                project = project,
+                                changeCount = editsData.size,
+                                onAcceptAll = { 
+                                    highlighter?.acceptAll()
+                                },
+                                onUndo = {
+                                    // If highlighter exists, use it; otherwise restore original text directly
+                                    if (highlighter != null) {
+                                        highlighter.rejectAll()
+                                    } else {
+                                        WriteCommandAction.runWriteCommandAction(project) {
+                                            document.setText(originalDocumentText)
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    }
                 }
             }
         } catch (e: Exception) {
