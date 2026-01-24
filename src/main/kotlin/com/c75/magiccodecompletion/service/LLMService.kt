@@ -15,7 +15,6 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.awt.datatransfer.StringSelection
 import java.io.IOException
-import java.net.URI
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ScheduledFuture
@@ -130,7 +129,7 @@ class LLMService {
         }
         
         // Build initial user message with file tree
-        var userMessage = buildString {
+        val userMessage = buildString {
             if (project != null) {
                 val projectSettings = com.c75.magiccodecompletion.settings.MagicCodeCompletionProjectSettings.getInstance(project).state
                 if (projectSettings.codeMapIncludePatterns.isNotEmpty()) {

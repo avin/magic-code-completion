@@ -53,7 +53,6 @@ object CodeChangeNotification {
             }
         })
         
-        // Auto-expire after 10 seconds
         notification.notify(project)
     }
 }

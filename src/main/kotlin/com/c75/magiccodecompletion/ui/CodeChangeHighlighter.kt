@@ -9,7 +9,6 @@ import com.intellij.openapi.editor.markup.TextAttributes
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.ui.JBColor
-import java.awt.Font
 
 /**
  * Stores information about a code change for potential rollback
@@ -122,7 +121,6 @@ class CodeChangeHighlighter(
      * Accept all changes at once
      */
     fun acceptAll() {
-        highlighters.forEach { editor.markupModel.removeHighlighter(it) }
         clearAll()
     }
     

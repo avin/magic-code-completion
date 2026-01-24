@@ -52,6 +52,11 @@ class InsertCodeFromLLMAction : AnAction() {
         private val isGenerating = AtomicBoolean(false)
     }
     
+    private data class LlmEdit(
+        val search: String? = null,
+        val replace: String? = null
+    )
+    
     private val gson = Gson()
     
     override fun getActionUpdateThread(): ActionUpdateThread {
@@ -203,11 +208,7 @@ class InsertCodeFromLLMAction : AnAction() {
             }
             
             override fun onSuccess() {
-                animationTask?.cancel(false)
-                ApplicationManager.getApplication().invokeLater {
-                    focusManager.removeKeyEventDispatcher(escDispatcher)
-                    inlayHint?.let { Disposer.dispose(it) }
-                }
+                cleanupGeneration(animationTask, focusManager, escDispatcher, inlayHint)
                 
                 isGenerating.set(false)
                 
@@ -249,11 +250,7 @@ class InsertCodeFromLLMAction : AnAction() {
             }
             
             override fun onThrowable(throwable: Throwable) {
-                animationTask?.cancel(false)
-                ApplicationManager.getApplication().invokeLater {
-                    focusManager.removeKeyEventDispatcher(escDispatcher)
-                    inlayHint?.let { Disposer.dispose(it) }
-                }
+                cleanupGeneration(animationTask, focusManager, escDispatcher, inlayHint)
                 
                 isGenerating.set(false)
                 
@@ -265,11 +262,7 @@ class InsertCodeFromLLMAction : AnAction() {
             }
             
             override fun onCancel() {
-                animationTask?.cancel(false)
-                ApplicationManager.getApplication().invokeLater {
-                    focusManager.removeKeyEventDispatcher(escDispatcher)
-                    inlayHint?.let { Disposer.dispose(it) }
-                }
+                cleanupGeneration(animationTask, focusManager, escDispatcher, inlayHint)
                 
                 isGenerating.set(false)
             }
@@ -285,8 +278,7 @@ class InsertCodeFromLLMAction : AnAction() {
     ) {
         try {
             val settings = MagicCodeCompletionSettings.getInstance().state
-            @Suppress("UNCHECKED_CAST")
-            val editsData = gson.fromJson(editsJson, List::class.java) as List<Map<String, String>>
+            val editsData = gson.fromJson(editsJson, Array<LlmEdit>::class.java)?.toList().orEmpty()
             
             // Save original document state before changes
             val originalDocumentText = document.text
@@ -309,8 +301,8 @@ class InsertCodeFromLLMAction : AnAction() {
                     
                     // Apply edits sequentially
                     for (edit in editsData) {
-                        val search = edit["search"] ?: continue
-                        val rawReplace = edit["replace"] ?: ""
+                        val search = edit.search ?: continue
+                        val rawReplace = edit.replace ?: ""
                         
                         // Check if replace contains cursor marker - remember position and remove it
                         val cursorInReplace = rawReplace.indexOf(CURSOR_MARKER)
@@ -418,6 +410,19 @@ class InsertCodeFromLLMAction : AnAction() {
                 "Failed to apply edits: ${e.message}",
                 "Error"
             )
+        }
+    }
+    
+    private fun cleanupGeneration(
+        animationTask: ScheduledFuture<*>?,
+        focusManager: KeyboardFocusManager,
+        escDispatcher: KeyEventDispatcher,
+        inlayHint: Inlay<*>?
+    ) {
+        animationTask?.cancel(false)
+        ApplicationManager.getApplication().invokeLater {
+            focusManager.removeKeyEventDispatcher(escDispatcher)
+            inlayHint?.let { Disposer.dispose(it) }
         }
     }
 }

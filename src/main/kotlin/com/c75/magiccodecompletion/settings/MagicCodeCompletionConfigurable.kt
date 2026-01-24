@@ -230,6 +230,8 @@ class MagicCodeCompletionConfigurable(private val project: Project) : Configurab
         excludeFilesEnabled = projectSettings.excludeFiles
         excludePatternsText = projectSettings.excludePatterns.joinToString("\n")
         debugModeEnabled = settings.debugMode
+        showChangeHighlightingEnabled = settings.showChangeHighlighting
+        showChangeNotificationEnabled = settings.showChangeNotification
         systemPromptContent = settings.systemPrompt
         settingsPanel?.reset()
     }
