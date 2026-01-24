@@ -21,23 +21,6 @@
         3. Specify glob patterns for files you want the LLM to see - during completion generation, the LLM will see the list of these files and can read them if needed to expand context<br>
         4. Place your cursor at the location where you want code completion<br>
         5. Press <strong>Alt+I</strong><br>
-        <br>
-        <strong>Why this plugin?</strong><br>
-        <br>
-        <em>Better than standard autocomplete:</em>
-        <ul>
-            <li>🌳 Sees entire project structure, not just nearby lines</li>
-            <li>📖 Reads relevant files on demand for context-aware completions</li>
-            <li>🧠 Uses advanced reasoning models instead of basic pattern matching</li>
-            <li>✨ Generates complete implementations, not just snippets</li>
-        </ul>
-        <em>More convenient than chat agents:</em>
-        <ul>
-            <li>⌨️ Single hotkey (Alt+I) at cursor position - no switching windows</li>
-            <li>🚫 No manual copy-paste or context explanation needed</li>
-            <li>🎯 Focused action: "complete here" vs. vague multi-file chat requests</li>
-            <li>⚙️ Controlled file access via include/exclude patterns</li>
-        </ul>
     ]]></description>
 
     <!-- Product and plugin compatibility requirements.
