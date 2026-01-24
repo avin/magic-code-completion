@@ -8,35 +8,18 @@
   <img src=".github/demo.gif" alt="Demo" width="600">
 </div>
 
-## Features
+## How to Use
 
-- **Alt+I hotkey** - Quick code completion at cursor position
-- **Agentic file access** - LLM can dynamically request and read project files
-- **Multi-edit support** - Apply multiple code changes in a single request
-- **Visual change tracking** - See highlighted changes with accept/reject actions
-- **Project-aware** - File tree context
+### Initial Setup
 
-## Settings
+1. Open **Tools → Magic Code Completion** in your IDE
+2. Configure API access to your LLM (we recommend using advanced reasoning models for better code quality)
+3. Specify glob patterns for files you want the LLM to see - during completion generation, the LLM will see the list of these files and can read them if needed to expand context
 
-**Tools → Magic Code Completion**
+### Using the Plugin
 
-### API Configuration (Global)
-- API Endpoint (default: OpenAI)
-- API Key
-- Model name
-- System prompt
-- Temperature, max tokens
-- Timeouts
-- Debug mode
-
-### Project Files (Project-specific)
-- Include patterns - glob patterns for files to include in context
-- Exclude patterns - regex patterns for test files and other exclusions
-
-## How it works
-
-1. Press **Alt+I** in any editor at the point where you want to insert a completion
-2. Plugin sends current file with cursor position marker + file tree to LLM
-3. LLM can request to read additional project files or apply code changes
-4. Changes are applied
-
+1. Place your cursor at the location where you want code completion
+2. Press **Alt+I**
+3. The plugin sends your current file (with cursor position) and file tree to the LLM
+4. The LLM either requests additional file contents or generates code completion immediately
+5. Changes are applied automatically
