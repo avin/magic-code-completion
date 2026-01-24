@@ -31,7 +31,7 @@ class MagicCodeCompletionSettings : PersistentStateComponent<MagicCodeCompletion
     }
     
     companion object {
-        private const val ACTIVE_PROMPT_FILE = "prompts/system_prompt_v2.txt"
+        private const val ACTIVE_PROMPT_FILE = "prompts/system_prompt_v3.txt"
         
         val DEFAULT_SYSTEM_PROMPT: String by lazy {
             loadPromptFromResources(ACTIVE_PROMPT_FILE)
