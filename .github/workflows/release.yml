@@ -34,19 +34,21 @@ jobs:
       
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
+      
+    - name: Get version from tag
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
     - name: Build plugin
       run: ./gradlew buildPlugin
+      env:
+        VERSION: ${{ steps.get_version.outputs.VERSION }}
       
     - name: Cleanup build cache
       run: |
         rm -rf build/idea-sandbox
         rm -rf build/tmp
         df -h
-      
-    - name: Get version from tag
-      id: get_version
-      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
       
     - name: List build artifacts
       run: |
