@@ -127,7 +127,7 @@ class InsertCodeFromLLMAction : AnAction() {
                     
                     private fun getCurrentSpinnerText(): String {
                         val frame = SPINNER_FRAMES[frameIndex.get() % SPINNER_FRAMES.size]
-                        return "$frame Generating code... (ESC to cancel)"
+                        return "$frame Generating code..."
                     }
                 }
             )
