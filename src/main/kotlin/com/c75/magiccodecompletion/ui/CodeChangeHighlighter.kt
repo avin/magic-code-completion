@@ -2,6 +2,8 @@ package com.c75.magiccodecompletion.ui
 
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.event.DocumentEvent
+import com.intellij.openapi.editor.event.DocumentListener
 import com.intellij.openapi.editor.markup.HighlighterLayer
 import com.intellij.openapi.editor.markup.HighlighterTargetArea
 import com.intellij.openapi.editor.markup.RangeHighlighter
@@ -29,12 +31,32 @@ class CodeChangeHighlighter(
     private val highlighters = mutableListOf<RangeHighlighter>()
     private val edits = mutableListOf<CodeEdit>()
     private var originalDocumentText: String = ""
+    private var isInternalEdit = false // Flag to prevent recursive listener calls
+    
+    private val documentListener = object : DocumentListener {
+        override fun documentChanged(event: DocumentEvent) {
+            // Ignore changes made by our own reject/rejectAll operations
+            if (isInternalEdit) return
+            
+            // Check if the change overlaps with any highlighted range
+            val changedRange = TextRange(event.offset, event.offset + event.newLength)
+            val highlightersToAccept = highlighters.filter { highlighter ->
+                val highlightRange = TextRange(highlighter.startOffset, highlighter.endOffset)
+                highlightRange.intersects(changedRange) || changedRange.contains(highlightRange)
+            }.toList()
+            
+            // Auto-accept all overlapping changes
+            highlightersToAccept.forEach { acceptChange(it) }
+        }
+    }
     
     /**
      * Store the original document state before changes
      */
     fun saveOriginalState(documentText: String) {
         originalDocumentText = documentText
+        // Register document listener when we start tracking changes
+        editor.document.addDocumentListener(documentListener)
     }
     
     /**
@@ -100,9 +122,14 @@ class CodeChangeHighlighter(
         
         if (edit != null) {
             // Revert this specific change - must be in write action
-            WriteCommandAction.runWriteCommandAction(project) {
-                val document = editor.document
-                document.replaceString(startOffset, endOffset, edit.originalText)
+            isInternalEdit = true
+            try {
+                WriteCommandAction.runWriteCommandAction(project) {
+                    val document = editor.document
+                    document.replaceString(startOffset, endOffset, edit.originalText)
+                }
+            } finally {
+                isInternalEdit = false
             }
             
             // Remove highlighter
@@ -130,9 +157,14 @@ class CodeChangeHighlighter(
     fun rejectAll() {
         val savedOriginalText = originalDocumentText
         if (savedOriginalText.isNotEmpty()) {
-            WriteCommandAction.runWriteCommandAction(project) {
-                val document = editor.document
-                document.setText(savedOriginalText)
+            isInternalEdit = true
+            try {
+                WriteCommandAction.runWriteCommandAction(project) {
+                    val document = editor.document
+                    document.setText(savedOriginalText)
+                }
+            } finally {
+                isInternalEdit = false
             }
         }
         clearAll()
@@ -146,6 +178,8 @@ class CodeChangeHighlighter(
         highlighters.clear()
         edits.clear()
         originalDocumentText = ""
+        // Remove document listener when all changes are cleared
+        editor.document.removeDocumentListener(documentListener)
     }
     
     /**
