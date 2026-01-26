@@ -10,7 +10,7 @@ import com.intellij.openapi.components.*
 class MagicCodeCompletionSettings : PersistentStateComponent<MagicCodeCompletionSettings.State> {
     
     data class State(
-        var apiEndpoint: String = "https://api.openai.com/v1/chat/completions",
+        var apiEndpoint: String = "https://api.openai.com/v1",
         var apiKey: String = "",
         var model: String = "gpt-4",
         var systemPrompt: String = DEFAULT_SYSTEM_PROMPT,

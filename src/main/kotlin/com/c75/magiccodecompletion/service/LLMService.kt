@@ -29,10 +29,23 @@ class LLMService {
     private val LOG = Logger.getInstance(LLMService::class.java)
     
     private fun createClient(settings: MagicCodeCompletionSettings.State): OkHttpClient {
+        return createClient(settings.connectTimeout, settings.readTimeout, settings.writeTimeout)
+    }
+    
+    private fun createClient(
+        connectTimeout: Int,
+        readTimeout: Int,
+        writeTimeout: Int,
+        callTimeoutSeconds: Int? = null
+    ): OkHttpClient {
         val builder = OkHttpClient.Builder()
-            .connectTimeout(settings.connectTimeout.toLong(), TimeUnit.SECONDS)
-            .readTimeout(settings.readTimeout.toLong(), TimeUnit.SECONDS)
-            .writeTimeout(settings.writeTimeout.toLong(), TimeUnit.SECONDS)
+            .connectTimeout(connectTimeout.toLong(), TimeUnit.SECONDS)
+            .readTimeout(readTimeout.toLong(), TimeUnit.SECONDS)
+            .writeTimeout(writeTimeout.toLong(), TimeUnit.SECONDS)
+        
+        if (callTimeoutSeconds != null) {
+            builder.callTimeout(callTimeoutSeconds.toLong(), TimeUnit.SECONDS)
+        }
         
         // Add IDE SSL certificate trust
         try {
@@ -104,6 +117,82 @@ class LLMService {
         val type: String?
     )
     
+    data class ModelsResponse(
+        val data: List<ModelInfo>?,
+        val error: ErrorResponse?
+    )
+    
+    data class ModelInfo(
+        val id: String
+    )
+    
+    fun fetchModels(
+        apiBaseUrl: String,
+        apiKey: String,
+        connectTimeout: Int,
+        readTimeout: Int,
+        writeTimeout: Int
+    ): List<String> {
+        return fetchModels(
+            apiBaseUrl = apiBaseUrl,
+            apiKey = apiKey,
+            connectTimeout = connectTimeout,
+            readTimeout = readTimeout,
+            writeTimeout = writeTimeout,
+            callTimeoutSeconds = DEFAULT_MODEL_CALL_TIMEOUT_SECONDS
+        )
+    }
+    
+    fun fetchModels(
+        apiBaseUrl: String,
+        apiKey: String,
+        connectTimeout: Int,
+        readTimeout: Int,
+        writeTimeout: Int,
+        callTimeoutSeconds: Int
+    ): List<String> {
+        if (apiKey.isBlank()) {
+            throw LLMException("API key is not configured. Please set it in Settings > Magic Code Completion")
+        }
+        
+        val modelsUrl = buildApiUrl(apiBaseUrl, MODELS_PATH)
+        
+        val request = Request.Builder()
+            .url(modelsUrl)
+            .addHeader("Authorization", "Bearer $apiKey")
+            .addHeader("Content-Type", "application/json")
+            .get()
+            .build()
+        
+        val client = createClient(connectTimeout, readTimeout, writeTimeout, callTimeoutSeconds)
+        val response = client.newCall(request).execute()
+        val responseBody = response.body?.string()
+            ?: throw LLMException("Empty response from API")
+        
+        if (!response.isSuccessful) {
+            val errorResponse = try {
+                gson.fromJson(responseBody, ModelsResponse::class.java)
+            } catch (e: Exception) {
+                null
+            }
+            
+            val errorMessage = errorResponse?.error?.message
+                ?: "HTTP ${response.code}: ${response.message}"
+            throw LLMException("API request failed: $errorMessage")
+        }
+        
+        val modelsResponse = gson.fromJson(responseBody, ModelsResponse::class.java)
+        
+        if (modelsResponse.error != null) {
+            throw LLMException("API error: ${modelsResponse.error.message}")
+        }
+        
+        return modelsResponse.data
+            ?.map { it.id }
+            ?.filter { it.isNotBlank() }
+            ?: emptyList()
+    }
+    
     /**
      * Send code with cursor marker to LLM and get completion
      * @param codeWithCursor The code with <<<CURSOR>>> marker
@@ -127,6 +216,13 @@ class LLMService {
         if (settings.apiKey.isBlank()) {
             throw LLMException("API key is not configured. Please set it in Settings > Magic Code Completion")
         }
+        
+        val baseUrl = normalizeApiBaseUrl(settings.apiEndpoint)
+        if (baseUrl.isBlank()) {
+            throw LLMException("API base URL is not configured. Please set it in Settings > Magic Code Completion")
+        }
+        
+        val chatUrl = buildApiUrl(baseUrl, CHAT_COMPLETIONS_PATH)
         
         // Build initial user message with file tree
         val userMessage = buildString {
@@ -252,11 +348,11 @@ class LLMService {
                 
                 // Debug logging if enabled
                 if (settings.debugMode && iteration == 1) {
-                    logDebugRequest(settings, userMessage)
+                    logDebugRequest(settings, userMessage, baseUrl, chatUrl)
                 }
                 
                 val request = Request.Builder()
-                    .url(settings.apiEndpoint)
+                    .url(chatUrl)
                     .addHeader("Authorization", "Bearer ${settings.apiKey}")
                     .addHeader("Content-Type", "application/json")
                     .post(requestBody)
@@ -468,12 +564,18 @@ class LLMService {
         }
     }
     
-    private fun logDebugRequest(settings: MagicCodeCompletionSettings.State, userMessage: String) {
+    private fun logDebugRequest(
+        settings: MagicCodeCompletionSettings.State,
+        userMessage: String,
+        baseUrl: String,
+        chatUrl: String
+    ) {
         val fullRequest = buildString {
             appendLine("=".repeat(80))
             appendLine("LLM REQUEST DEBUG")
             appendLine("=".repeat(80))
-            appendLine("Endpoint: ${settings.apiEndpoint}")
+            appendLine("API Base URL: $baseUrl")
+            appendLine("Chat Endpoint: $chatUrl")
             appendLine("Model: ${settings.model}")
             appendLine("Temperature: ${settings.temperature}")
             appendLine("Max Tokens: ${settings.maxTokens}")
@@ -513,6 +615,35 @@ class LLMService {
     class LLMException(message: String, cause: Throwable? = null) : Exception(message, cause)
     
     companion object {
+        private const val CHAT_COMPLETIONS_PATH = "/chat/completions"
+        private const val MODELS_PATH = "/models"
+        private const val DEFAULT_MODEL_CALL_TIMEOUT_SECONDS = 20
+        
         fun getInstance(): LLMService = service()
+    }
+    
+    private fun normalizeApiBaseUrl(apiBaseUrl: String): String {
+        val trimmed = apiBaseUrl.trim()
+        if (trimmed.isEmpty()) {
+            return trimmed
+        }
+        
+        val withoutTrailingSlash = trimmed.removeSuffix("/")
+        val chatSuffix = CHAT_COMPLETIONS_PATH
+        return if (withoutTrailingSlash.endsWith(chatSuffix)) {
+            withoutTrailingSlash.removeSuffix(chatSuffix)
+        } else {
+            withoutTrailingSlash
+        }
+    }
+    
+    private fun buildApiUrl(apiBaseUrl: String, path: String): String {
+        val normalizedBase = normalizeApiBaseUrl(apiBaseUrl)
+        if (normalizedBase.isBlank()) {
+            throw LLMException("API base URL is not configured. Please set it in Settings > Magic Code Completion")
+        }
+        
+        val normalizedPath = if (path.startsWith("/")) path else "/$path"
+        return normalizedBase + normalizedPath
     }
 }

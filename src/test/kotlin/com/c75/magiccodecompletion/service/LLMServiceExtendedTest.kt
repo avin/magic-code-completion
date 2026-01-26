@@ -28,7 +28,7 @@ class LLMServiceExtendedTest {
         llmService = LLMService()
         settings = MagicCodeCompletionSettings.State()
         
-        settings.apiEndpoint = mockServer.url("/v1/chat/completions").toString()
+        settings.apiEndpoint = mockServer.url("/v1").toString()
         settings.apiKey = "test-api-key"
         settings.model = "gpt-4"
         settings.temperature = 0.7

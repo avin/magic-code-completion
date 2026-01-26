@@ -23,7 +23,7 @@ class LLMServiceTest {
         settings = MagicCodeCompletionSettings.State()
         
         // Configure settings to use mock server
-        settings.apiEndpoint = mockServer.url("/v1/chat/completions").toString()
+        settings.apiEndpoint = mockServer.url("/v1").toString()
         settings.apiKey = "test-api-key"
         settings.model = "gpt-4"
         settings.temperature = 0.7
@@ -207,5 +207,35 @@ class LLMServiceTest {
         val result = llmService.getCodeCompletion("test", null, null, settings)
         
         assertEquals("trimmed content", result)
+    }
+    
+    @Test
+    fun `test fetch models returns ids`() {
+        val mockResponse = """
+            {
+                "data": [
+                    { "id": "gpt-4" },
+                    { "id": "gpt-3.5-turbo" }
+                ]
+            }
+        """.trimIndent()
+        
+        mockServer.enqueue(MockResponse()
+            .setResponseCode(200)
+            .setBody(mockResponse)
+            .addHeader("Content-Type", "application/json"))
+        
+        val models = llmService.fetchModels(
+            settings.apiEndpoint,
+            settings.apiKey,
+            settings.connectTimeout,
+            settings.readTimeout,
+            settings.writeTimeout
+        )
+        
+        assertEquals(listOf("gpt-4", "gpt-3.5-turbo"), models)
+        
+        val request = mockServer.takeRequest()
+        assertEquals("/v1/models", request.path)
     }
 }

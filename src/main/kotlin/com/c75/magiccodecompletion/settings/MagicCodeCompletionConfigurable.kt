@@ -1,13 +1,21 @@
 package com.c75.magiccodecompletion.settings
 
+import com.c75.magiccodecompletion.service.LLMService
 import com.intellij.icons.AllIcons
+import com.intellij.notification.NotificationGroupManager
+import com.intellij.notification.NotificationType
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPasswordField
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.dsl.builder.*
+import javax.swing.DefaultComboBoxModel
+import javax.swing.JButton
 import javax.swing.JComponent
 
 class MagicCodeCompletionConfigurable(private val project: Project) : Configurable {
@@ -17,7 +25,13 @@ class MagicCodeCompletionConfigurable(private val project: Project) : Configurab
     // UI components
     private val apiEndpointField = JBTextField()
     private val apiKeyField = JBPasswordField()
-    private val modelField = JBTextField()
+    private val modelComboBoxModel = DefaultComboBoxModel<String>()
+    private val modelComboBox = ComboBox<String>(modelComboBoxModel)
+    private val refreshModelsButton = JButton("Refresh")
+    private var modelsLoadedFromApi = false
+    private var modelRefreshInProgress = false
+    private var currentModels: List<String> = emptyList()
+    private var modelRequestId = 0
     private var temperatureValue = 0.7
     private var maxTokensValue = 2000
     private var connectTimeoutValue = 30
@@ -40,7 +54,7 @@ class MagicCodeCompletionConfigurable(private val project: Project) : Configurab
         // Initialize fields with current settings
         apiEndpointField.text = settings.apiEndpoint
         apiKeyField.text = settings.apiKey
-        modelField.text = settings.model
+        updateModelOptions(listOf(settings.model), settings.model, fromApi = false)
         temperatureValue = settings.temperature
         maxTokensValue = settings.maxTokens
         connectTimeoutValue = settings.connectTimeout
@@ -53,23 +67,29 @@ class MagicCodeCompletionConfigurable(private val project: Project) : Configurab
         debugModeEnabled = settings.debugMode
         showChangeHighlightingEnabled = settings.showChangeHighlighting
         showChangeNotificationEnabled = settings.showChangeNotification
+        modelComboBox.isEditable = false
+        refreshModelsButton.addActionListener {
+            val currentSelection = modelComboBox.selectedItem?.toString()
+            refreshModelsAsync(showErrors = true, preferredModel = currentSelection)
+        }
         
         settingsPanel = panel {
-            group("OpenAI API Configuration") {
+            group("OpenAI-Compatible API Configuration") {
                 row("API Endpoint:") {
                     cell(apiEndpointField)
                         .columns(COLUMNS_LARGE)
-                        .comment("OpenAI-compatible API endpoint")
+                        .comment("API base URL (e.g., https://api.openai.com/v1)")
                 }
                 row("API Key:") {
                     cell(apiKeyField)
                         .columns(COLUMNS_LARGE)
-                        .comment("Your API key (will be stored securely)")
+                        .comment("API key")
                 }
                 row("Model:") {
-                    cell(modelField)
-                        .columns(COLUMNS_MEDIUM)
-                        .comment("Model name (e.g., gpt-4, gpt-3.5-turbo)")
+                    cell(modelComboBox)
+                        .columns(COLUMNS_LARGE)
+                        .comment("Select a model from the list")
+                    cell(refreshModelsButton)
                 }
                 row("Temperature:") {
                     val temperatureSlider = slider(0, 20, 1, 10)
@@ -94,7 +114,7 @@ class MagicCodeCompletionConfigurable(private val project: Project) : Configurab
                 }
                 row("Read Timeout:") {
                     intTextField(10..600)
-                        .comment("Timeout for reading LLM response (increase for slow APIs)")
+                        .comment("Timeout for reading LLM response")
                         .bindIntText({ readTimeoutValue }, { readTimeoutValue = it })
                 }
                 row("Write Timeout:") {
@@ -134,12 +154,12 @@ class MagicCodeCompletionConfigurable(private val project: Project) : Configurab
                 row {
                     checkBox("Show change highlighting with gutter icons")
                         .bindSelected({ showChangeHighlightingEnabled }, { showChangeHighlightingEnabled = it })
-                        .comment("Highlight LLM-generated changes with green background and ⚡ icons in gutter")
+                        .comment("Highlight LLM-generated changes with green background and icon in gutter")
                 }
                 row {
                     checkBox("Show notification with Accept/Undo buttons")
                         .bindSelected({ showChangeNotificationEnabled }, { showChangeNotificationEnabled = it })
-                        .comment("Display notification balloon with 'Accept All Changes' and 'Undo All Changes' buttons")
+                        .comment("Display notification balloon with 'Accept/Undo Changes'")
                 }
             }
             
@@ -179,7 +199,7 @@ class MagicCodeCompletionConfigurable(private val project: Project) : Configurab
         return panelModified ||
                 apiEndpointField.text != settings.apiEndpoint ||
                 String(apiKeyField.password) != settings.apiKey ||
-                modelField.text != settings.model ||
+                modelComboBox.selectedItem?.toString() != settings.model ||
                 temperatureValue != settings.temperature
     }
     
@@ -190,7 +210,10 @@ class MagicCodeCompletionConfigurable(private val project: Project) : Configurab
         
         settings.apiEndpoint = apiEndpointField.text
         settings.apiKey = String(apiKeyField.password)
-        settings.model = modelField.text
+        val selectedModel = modelComboBox.selectedItem?.toString()?.trim().orEmpty()
+        if (selectedModel.isNotBlank()) {
+            settings.model = selectedModel
+        }
         settings.temperature = temperatureValue
         settings.maxTokens = maxTokensValue
         settings.connectTimeout = connectTimeoutValue
@@ -220,7 +243,8 @@ class MagicCodeCompletionConfigurable(private val project: Project) : Configurab
         
         apiEndpointField.text = settings.apiEndpoint
         apiKeyField.text = settings.apiKey
-        modelField.text = settings.model
+        val modelsSource = if (modelsLoadedFromApi) currentModels else listOf(settings.model)
+        updateModelOptions(modelsSource, settings.model, fromApi = modelsLoadedFromApi)
         temperatureValue = settings.temperature
         maxTokensValue = settings.maxTokens
         connectTimeoutValue = settings.connectTimeout
@@ -234,5 +258,107 @@ class MagicCodeCompletionConfigurable(private val project: Project) : Configurab
         showChangeNotificationEnabled = settings.showChangeNotification
         systemPromptContent = settings.systemPrompt
         settingsPanel?.reset()
+    }
+    
+    private fun updateModelOptions(models: List<String>, preferredModel: String?, fromApi: Boolean) {
+        modelsLoadedFromApi = fromApi
+        currentModels = models
+        modelComboBoxModel.removeAllElements()
+        models.forEach { modelComboBoxModel.addElement(it) }
+        
+        val selectedModel = when {
+            preferredModel != null && models.contains(preferredModel) -> preferredModel
+            models.isNotEmpty() -> models.first()
+            else -> null
+        }
+        
+        if (selectedModel != null) {
+            modelComboBox.selectedItem = selectedModel
+        }
+    }
+    
+    private fun refreshModelsAsync(showErrors: Boolean, preferredModel: String?) {
+        if (modelRefreshInProgress) {
+            return
+        }
+        
+        val apiBaseUrl = apiEndpointField.text.trim()
+        val apiKey = String(apiKeyField.password).trim()
+        if (apiBaseUrl.isBlank() || apiKey.isBlank()) {
+            if (showErrors) {
+                notifyModelLoad("API base URL and API key are required to load models.", NotificationType.WARNING)
+            }
+            return
+        }
+        
+        setRefreshInProgress(true)
+        val modalityState = settingsPanel?.let { ModalityState.stateForComponent(it) } ?: ModalityState.any()
+        val connectTimeout = minOf(connectTimeoutValue, MODEL_REFRESH_CONNECT_TIMEOUT_SECONDS)
+        val readTimeout = minOf(readTimeoutValue, MODEL_REFRESH_READ_TIMEOUT_SECONDS)
+        val writeTimeout = minOf(writeTimeoutValue, MODEL_REFRESH_WRITE_TIMEOUT_SECONDS)
+        val requestId = ++modelRequestId
+        
+        ApplicationManager.getApplication().executeOnPooledThread {
+            var models: List<String>? = null
+            var errorMessage: String? = null
+            try {
+                models = LLMService.getInstance().fetchModels(
+                    apiBaseUrl,
+                    apiKey,
+                    connectTimeout,
+                    readTimeout,
+                    writeTimeout,
+                    MODEL_REFRESH_CALL_TIMEOUT_SECONDS
+                )
+            } catch (e: Exception) {
+                errorMessage = e.message ?: "Failed to load models."
+            }
+            
+            ApplicationManager.getApplication().invokeLater({
+                if (requestId != modelRequestId) {
+                    return@invokeLater
+                }
+                setRefreshInProgress(false)
+                
+                if (errorMessage != null) {
+                    if (showErrors || !modelsLoadedFromApi) {
+                        notifyModelLoad(errorMessage!!, NotificationType.ERROR)
+                    }
+                    return@invokeLater
+                }
+                
+                if (models == null) {
+                    return@invokeLater
+                }
+                if (models!!.isEmpty()) {
+                    if (showErrors) {
+                        notifyModelLoad("No models returned by the API.", NotificationType.WARNING)
+                    }
+                    return@invokeLater
+                }
+                
+                updateModelOptions(models!!, preferredModel, fromApi = true)
+            }, modalityState)
+        }
+    }
+    
+    private fun setRefreshInProgress(inProgress: Boolean) {
+        modelRefreshInProgress = inProgress
+        refreshModelsButton.isEnabled = !inProgress
+        refreshModelsButton.text = if (inProgress) "Loading..." else "Refresh"
+    }
+    
+    private fun notifyModelLoad(message: String, type: NotificationType) {
+        NotificationGroupManager.getInstance()
+            .getNotificationGroup("Magic Code Completion")
+            .createNotification("Model List", message, type)
+            .notify(project)
+    }
+    
+    companion object {
+        private const val MODEL_REFRESH_CONNECT_TIMEOUT_SECONDS = 5
+        private const val MODEL_REFRESH_READ_TIMEOUT_SECONDS = 15
+        private const val MODEL_REFRESH_WRITE_TIMEOUT_SECONDS = 5
+        private const val MODEL_REFRESH_CALL_TIMEOUT_SECONDS = 20
     }
 }

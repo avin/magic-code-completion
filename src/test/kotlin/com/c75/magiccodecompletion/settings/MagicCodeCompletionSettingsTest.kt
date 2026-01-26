@@ -17,7 +17,7 @@ class MagicCodeCompletionSettingsTest {
     fun `test default settings values`() {
         val state = settings.state
         
-        assertEquals("https://api.openai.com/v1/chat/completions", state.apiEndpoint)
+        assertEquals("https://api.openai.com/v1", state.apiEndpoint)
         assertEquals("", state.apiKey)
         assertEquals("gpt-4", state.model)
         assertEquals(0.7, state.temperature, 0.001)
@@ -28,7 +28,7 @@ class MagicCodeCompletionSettingsTest {
     @Test
     fun `test state persistence`() {
         val state = settings.state
-        state.apiEndpoint = "https://custom.api.com/v1/chat"
+        state.apiEndpoint = "https://custom.api.com/v1"
         state.apiKey = "custom-key-123"
         state.model = "gpt-3.5-turbo"
         state.temperature = 0.5
@@ -42,7 +42,7 @@ class MagicCodeCompletionSettingsTest {
         val newSettings = MagicCodeCompletionSettings()
         newSettings.loadState(savedState)
         
-        assertEquals("https://custom.api.com/v1/chat", newSettings.state.apiEndpoint)
+        assertEquals("https://custom.api.com/v1", newSettings.state.apiEndpoint)
         assertEquals("custom-key-123", newSettings.state.apiKey)
         assertEquals("gpt-3.5-turbo", newSettings.state.model)
         assertEquals(0.5, newSettings.state.temperature, 0.001)
