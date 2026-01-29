@@ -16,26 +16,59 @@ class FileTreeService(private val project: Project) {
      * Generate file tree for project, optionally filtered by include patterns.
      */
     fun generateFileTree(includePatterns: List<String> = emptyList(), currentFilePath: String? = null): String {
+        return generateFileTreeInternal(
+            includePatterns = includePatterns,
+            currentFilePath = currentFilePath,
+            excludeFilesOverride = null,
+            excludePatternsOverride = null
+        )
+    }
+
+    /**
+     * Generate file tree preview with explicit include/exclude options (used by Settings UI).
+     */
+    fun generateFileTreePreview(
+        includePatterns: List<String>,
+        excludeFiles: Boolean,
+        excludePatterns: List<String>,
+        currentFilePath: String? = null
+    ): String {
+        return generateFileTreeInternal(
+            includePatterns = includePatterns,
+            currentFilePath = currentFilePath,
+            excludeFilesOverride = excludeFiles,
+            excludePatternsOverride = excludePatterns
+        )
+    }
+
+    private fun generateFileTreeInternal(
+        includePatterns: List<String>,
+        currentFilePath: String?,
+        excludeFilesOverride: Boolean?,
+        excludePatternsOverride: List<String>?
+    ): String {
         return ReadAction.compute<String, RuntimeException> {
             val basePath = project.basePath ?: return@compute ""
             val baseVirtualFile = com.intellij.openapi.vfs.LocalFileSystem.getInstance()
                 .findFileByPath(basePath) ?: return@compute ""
-            
+
             if (includePatterns.isEmpty()) {
                 return@compute ""
             }
-            
+
             val settings = com.c75.magiccodecompletion.settings.MagicCodeCompletionProjectSettings.getInstance(project).state
-            
+            val excludeFiles = excludeFilesOverride ?: settings.excludeFiles
+            val excludePatterns = excludePatternsOverride ?: settings.excludePatterns
+
             val matchers = includePatterns.map { pattern ->
                 val glob = "glob:$basePath/${pattern.trim()}"
                 FileSystems.getDefault().getPathMatcher(glob)
             }
-            
+
             // First, collect all matching files
             val matchingFiles = mutableListOf<VirtualFile>()
-            collectMatchingFiles(baseVirtualFile, basePath, matchers, settings.excludeFiles, settings.excludePatterns, matchingFiles)
-            
+            collectMatchingFiles(baseVirtualFile, basePath, matchers, excludeFiles, excludePatterns, matchingFiles)
+
             // Always include current file if specified (even if not matching patterns)
             if (currentFilePath != null) {
                 val currentFullPath = "$basePath/$currentFilePath"
@@ -44,11 +77,11 @@ class FileTreeService(private val project: Project) {
                     matchingFiles.add(currentFile)
                 }
             }
-            
+
             if (matchingFiles.isEmpty()) {
                 return@compute ""
             }
-            
+
             val builder = StringBuilder()
             builder.append("PROJECT FILE TREE:\n\n")
             buildTreeFromFiles(baseVirtualFile, basePath, "", matchingFiles, currentFilePath, builder)

@@ -1,19 +1,29 @@
 package com.c75.magiccodecompletion.settings
 
 import com.c75.magiccodecompletion.service.LLMService
+import com.c75.magiccodecompletion.services.FileTreeService
 import com.intellij.icons.AllIcons
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.components.service
+import com.intellij.openapi.editor.colors.EditorColorsManager
+import com.intellij.openapi.editor.colors.EditorFontType
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
+import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPasswordField
+import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.dsl.builder.*
+import java.awt.Dimension
 import javax.swing.DefaultComboBoxModel
 import javax.swing.JButton
 import javax.swing.JComponent
@@ -147,6 +157,11 @@ class MagicCodeCompletionConfigurable(private val project: Project) : Configurab
                         .bindText({ excludePatternsText }, { excludePatternsText = it })
                         .comment("Regex patterns to exclude files (one per line)")
                         .enabled(excludeFilesEnabled)
+                }
+                row {
+                    button("Show files") {
+                        showFileTreePreview()
+                    }.comment("Preview the file tree from current patterns as it will be seen by the LLM")
                 }
             }
             
@@ -360,5 +375,83 @@ class MagicCodeCompletionConfigurable(private val project: Project) : Configurab
         private const val MODEL_REFRESH_READ_TIMEOUT_SECONDS = 15
         private const val MODEL_REFRESH_WRITE_TIMEOUT_SECONDS = 5
         private const val MODEL_REFRESH_CALL_TIMEOUT_SECONDS = 20
+    }
+
+    private fun showFileTreePreview() {
+        settingsPanel?.apply()
+
+        val includePatterns = codeMapPatternsText
+            .lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .toList()
+
+        if (includePatterns.isEmpty()) {
+            Messages.showInfoMessage(
+                project,
+                "No include patterns configured. Add patterns to preview the project file tree.",
+                "Project File Tree"
+            )
+            return
+        }
+
+        val excludePatterns = if (excludeFilesEnabled) {
+            excludePatternsText
+                .lineSequence()
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .toList()
+        } else {
+            emptyList()
+        }
+
+        val fileTreeService = project.service<FileTreeService>()
+        val currentFilePath = resolveCurrentFilePath()
+        val fileTree = fileTreeService.generateFileTreePreview(
+            includePatterns = includePatterns,
+            excludeFiles = excludeFilesEnabled,
+            excludePatterns = excludePatterns,
+            currentFilePath = currentFilePath
+        )
+
+        val displayText = if (fileTree.isNotBlank()) {
+            fileTree
+        } else {
+            "No files matched the current patterns."
+        }
+
+        FileTreePreviewDialog(project, displayText).show()
+    }
+
+    private fun resolveCurrentFilePath(): String? {
+        val basePath = project.basePath ?: return null
+        val selectedFile = FileEditorManager.getInstance(project).selectedEditor?.file ?: return null
+        val fullPath = selectedFile.path
+        return if (fullPath.startsWith(basePath)) {
+            fullPath.removePrefix(basePath).removePrefix("/").removePrefix("\\")
+        } else {
+            null
+        }
+    }
+
+    private class FileTreePreviewDialog(project: Project, treeText: String) : DialogWrapper(project, true) {
+        private val textArea = JBTextArea(treeText)
+
+        init {
+            title = "Project File Tree"
+            init()
+        }
+
+        override fun createCenterPanel(): JComponent {
+            textArea.isEditable = false
+            textArea.lineWrap = false
+            textArea.wrapStyleWord = false
+            textArea.caretPosition = 0
+            textArea.font = EditorColorsManager.getInstance().globalScheme.getFont(EditorFontType.PLAIN)
+
+            val scrollPane = JBScrollPane(textArea)
+            scrollPane.preferredSize = Dimension(760, 520)
+            return scrollPane
+        }
     }
 }
