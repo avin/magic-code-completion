@@ -79,6 +79,6 @@ jobs:
         
         gh release create ${{ github.ref_name }} \
           --title "Release ${{ github.ref_name }}" \
-          --notes $releaseNotes \
+          --notes-file release-notes.md \
           --draft \
           ${{ steps.find_zip.outputs.ZIP_FILE }}

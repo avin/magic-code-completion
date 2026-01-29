@@ -36,6 +36,7 @@ class CodeChangeHighlighter(
     private var originalDocumentText: String = ""
     private var isInternalEdit = false // Flag to prevent recursive listener calls
     private var autoAcceptEnabled = false // Flag to control auto-accept behavior
+    private var isDocumentListenerRegistered = false
     
     private val documentListener = object : DocumentListener {
         override fun documentChanged(event: DocumentEvent) {
@@ -64,7 +65,7 @@ class CodeChangeHighlighter(
         originalDocumentText = documentText
         autoAcceptEnabled = false // Start with auto-accept disabled
         // Register document listener when we start tracking changes
-        editor.document.addDocumentListener(documentListener)
+        registerDocumentListenerIfNeeded()
     }
     
     /**
@@ -203,11 +204,23 @@ class CodeChangeHighlighter(
         edits.clear()
         originalDocumentText = ""
         // Remove document listener when all changes are cleared
-        editor.document.removeDocumentListener(documentListener)
+        unregisterDocumentListenerIfNeeded()
     }
     
     /**
      * Check if there are any pending changes
      */
     fun hasPendingChanges(): Boolean = highlighters.isNotEmpty()
+
+    private fun registerDocumentListenerIfNeeded() {
+        if (isDocumentListenerRegistered) return
+        editor.document.addDocumentListener(documentListener, project)
+        isDocumentListenerRegistered = true
+    }
+
+    private fun unregisterDocumentListenerIfNeeded() {
+        if (!isDocumentListenerRegistered) return
+        editor.document.removeDocumentListener(documentListener)
+        isDocumentListenerRegistered = false
+    }
 }
