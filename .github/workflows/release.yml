@@ -66,13 +66,19 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
+        $releaseNotes = @"
+        ## Added
+        - TBD
+
+        ## Changed
+        - TBD
+
+        ## Fixed
+        - TBD
+        "@
+        
         gh release create ${{ github.ref_name }} \
           --title "Release ${{ github.ref_name }}" \
-          --notes "Download the plugin zip file and install it in your IDE:
-
-          1. Open your IntelliJ IDEA or compatible IDE
-          2. Go to **Settings/Preferences** → **Plugins**
-          3. Click the **⚙️ (gear icon)** → **Install Plugin from Disk...**
-          4. Select the downloaded `.zip` file
-          5. Restart the IDE when prompted" \
+          --notes $releaseNotes \
+          --draft \
           ${{ steps.find_zip.outputs.ZIP_FILE }}
