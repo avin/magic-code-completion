@@ -95,10 +95,17 @@ class InsertCodeFromLLMAction : AnAction() {
         // Start spinner animation at cursor position
         var inlayHint: Inlay<*>? = null
         val frameIndex = AtomicInteger(0)
+        val statusText = AtomicReference("Generating code...")
         var animationTask: ScheduledFuture<*>? = null
         val cancelled = AtomicBoolean(false)
         val indicatorRef = AtomicReference<ProgressIndicator?>(null)
         val focusManager = KeyboardFocusManager.getCurrentKeyboardFocusManager()
+        val updateStatus: (String) -> Unit = { newText ->
+            statusText.set(newText)
+            ApplicationManager.getApplication().invokeLater {
+                inlayHint?.update()
+            }
+        }
         
         val escDispatcher = KeyEventDispatcher { event ->
             if (event.id == KeyEvent.KEY_PRESSED && event.keyCode == KeyEvent.VK_ESCAPE) {
@@ -135,7 +142,7 @@ class InsertCodeFromLLMAction : AnAction() {
                     
                     private fun getCurrentSpinnerText(): String {
                         val frame = SPINNER_FRAMES[frameIndex.get() % SPINNER_FRAMES.size]
-                        return "$frame Generating code..."
+                        return "$frame ${statusText.get()}"
                     }
                 }
             )
@@ -185,7 +192,8 @@ class InsertCodeFromLLMAction : AnAction() {
                         project, 
                         currentFilePath,
                         null, // settingsState
-                        wrappedIndicator // Wrapped indicator that checks our cancelled flag
+                        wrappedIndicator, // Wrapped indicator that checks our cancelled flag
+                        updateStatus
                     )
                     
                     // Check again after completion

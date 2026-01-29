@@ -200,6 +200,7 @@ class LLMService {
      * @param currentFilePath Current file path relative to project root
      * @param settingsState Optional settings state (for testing)
      * @param progressIndicator Optional progress indicator for cancellation support
+     * @param statusCallback Optional status callback for UI updates
      * @return Generated code to insert at cursor position
      * @throws IOException if network request fails
      * @throws LLMException if API returns an error
@@ -209,7 +210,8 @@ class LLMService {
         project: com.intellij.openapi.project.Project? = null,
         currentFilePath: String? = null,
         settingsState: MagicCodeCompletionSettings.State? = null,
-        progressIndicator: com.intellij.openapi.progress.ProgressIndicator? = null
+        progressIndicator: com.intellij.openapi.progress.ProgressIndicator? = null,
+        statusCallback: ((String) -> Unit)? = null
     ): String {
         val settings = settingsState ?: MagicCodeCompletionSettings.getInstance().state
         
@@ -443,6 +445,17 @@ class LLMService {
                         "read_file" -> {
                             val args = gson.fromJson(toolCall.function.arguments, Map::class.java)
                             val filePath = args["path"]?.toString() ?: ""
+                            val fileName = filePath
+                                .substringAfterLast('/')
+                                .substringAfterLast('\\')
+                                .ifBlank { filePath }
+                            val readingLabel = if (filePath.isBlank()) {
+                                "Reading file..."
+                            } else {
+                                "Reading $fileName..."
+                            }
+                            statusCallback?.invoke(readingLabel)
+                            progressIndicator?.text = readingLabel
                             
                             val fileTreeService = project?.service<com.c75.magiccodecompletion.services.FileTreeService>()
                             val fileContent = fileTreeService?.readFile(filePath)
