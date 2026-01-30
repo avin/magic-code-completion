@@ -38,5 +38,4 @@ This plugin is a good addition to the AI tools you already have for development.
 - 🎯 Focused action: "complete here" vs. vague multi-file chat requests
 
 ## Already have a subscription instead of API?
-If you already have subscriptions like Codex, Claude Code, GitHub Copilot (and others), you can use them instead of buying separate API access.  
-Use [CLIProxyAPIPlus](https://github.com/router-for-me/CLIProxyAPIPlus) to proxy your subscription into an OpenAI-compatible API.
+If you already have subscriptions like Codex, Claude Code, GitHub Copilot (and others), you can use them instead of buying separate API access. Use [CLIProxyAPIPlus](https://github.com/router-for-me/CLIProxyAPIPlus) to proxy your subscription into an OpenAI-compatible API.
