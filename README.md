@@ -26,14 +26,17 @@
 
 ## Why this plugin?
 
+This plugin is a good addition to the AI tools you already have for development.
+
 ### Better than standard autocomplete
 - 🌳 Sees entire project structure, not just nearby lines
 - 📖 Reads relevant files on demand for context-aware completions
 - 🧠 Uses advanced reasoning models instead of basic pattern matching
-- ✨ Generates complete implementations, not just snippets
 
 ### More convenient than chat agents
 - ⌨️ Single hotkey (Alt+I) at cursor position - no switching windows
-- 🚫 No manual copy-paste or context explanation needed
 - 🎯 Focused action: "complete here" vs. vague multi-file chat requests
-- ⚙️ Controlled file access via include/exclude patterns
+
+## Already have a subscription instead of API?
+If you already have subscriptions like Codex, Claude Code, GitHub Copilot (and others), you can use them instead of buying separate API access.  
+Use [CLIProxyAPIPlus](https://github.com/router-for-me/CLIProxyAPIPlus) to proxy your subscription into an OpenAI-compatible API.

@@ -21,6 +21,10 @@
         3. Specify glob patterns for files you want the LLM to see - during completion generation, the LLM will see the list of these files and can read them if needed to expand context<br>
         4. Place your cursor at the location where you want code completion<br>
         5. Press <strong>Alt+I</strong><br>
+        <br>
+        <strong>Already have a subscription instead of API?</strong><br>
+        If you already have subscriptions like Codex, Claude Code, GitHub Copilot (and others), you can use them instead of buying separate API access.<br>
+        Use <a href="https://github.com/router-for-me/CLIProxyAPIPlus">CLIProxyAPIPlus</a> to proxy your subscription into an OpenAI-compatible API.<br>
     ]]></description>
 
     <!-- Product and plugin compatibility requirements.
